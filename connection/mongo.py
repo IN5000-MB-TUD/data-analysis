@@ -21,15 +21,15 @@ class Mongo:
         :param tz_aware: The time zone awareness flag.
         """
 
-        host = os.getenv("MONGODB_HOST")
-        port = os.getenv("MONGODB_PORT")
+        host = os.getenv("MONGODB_HOST", "")
+        port = os.getenv("MONGODB_PORT", "")
         # add a colon to the port if the port exists
         if port != "":
             port = ":{}".format(port)
-        user = os.getenv("MONGODB_USER")
-        password = os.getenv("MONGODB_PASSWORD")
-        database = os.getenv("MONGODB_DATABASE")
-        query_params = os.getenv("MONGODB_QPARAMS")
+        user = os.getenv("MONGODB_USER", "")
+        password = os.getenv("MONGODB_PASSWORD", "")
+        database = os.getenv("MONGODB_DATABASE", "")
+        query_params = os.getenv("MONGODB_QPARAMS", "")
         # add a question mark to the query parameters if they exist.
         if query_params != "":
             query_params = "?{}".format(query_params)
@@ -55,7 +55,7 @@ class Mongo:
                 self.db = self.conn[database]
             except pe.InvalidURI:
                 self.conn = pymongo.MongoClient(
-                    "mongodb://{}:{}/{}{}".format(host, port, database, query_params),
+                    "mongodb://{}{}/{}{}".format(host, port, database, query_params),
                     connect=connect,
                     tz_aware=tz_aware,
                 )
