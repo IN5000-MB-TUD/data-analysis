@@ -237,24 +237,25 @@ class GitHubAPI:
                 return None
             else:
                 releases_to_add = len(github_api_response.json())
-                repository_releases.update(
-                    {
-                        release["name"]: {
-                            "tag_name": release["tag_name"],
-                            "target": release["target_commitish"],
-                            "body": release["body"],
-                            "draft": release["draft"],
-                            "prerelease": release["prerelease"],
-                            "created_at": datetime.strptime(
-                                release["created_at"], DATE_FORMAT
-                            ).replace(tzinfo=utc),
-                            "published_at": datetime.strptime(
-                                release["published_at"], DATE_FORMAT
-                            ).replace(tzinfo=utc),
+                for release in github_api_response.json():
+                    release_name = release["name"] if release["name"] else release["tag_name"]
+                    repository_releases.update(
+                        {
+                            release_name: {
+                                "tag_name": release["tag_name"],
+                                "target": release["target_commitish"],
+                                "body": release["body"],
+                                "draft": release["draft"],
+                                "prerelease": release["prerelease"],
+                                "created_at": datetime.strptime(
+                                    release["created_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc),
+                                "published_at": datetime.strptime(
+                                    release["published_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc),
+                            }
                         }
-                        for release in github_api_response.json()
-                    }
-                )
+                    )
             response_page += 1
 
         return repository_releases

@@ -25,6 +25,15 @@ if __name__ == "__main__":
             repository_owner = repository_url_split[-2]
             repository_name = repository_url_split[-1]
 
+            # Check if the data in te DB is older than 1 day, otherwise skip
+            repository_db_record = mo.db["repositories_data"].find_one(
+                {"name": repository_name, "owner": repository_owner},
+            )
+
+            if repository_db_record and (datetime.now(tz=utc) - repository_db_record["metadata"]["modified"]).seconds < 3600:
+                log.info(f"Skipping repository {repository_owner}/{repository_name} since it was updated less than 1 day ago.")
+                continue
+
             github_api_data = github_api_client.get_repository_data(
                 repository_owner, repository_name
             )
@@ -93,11 +102,6 @@ if __name__ == "__main__":
                         github_api_data["created_at"], DATE_FORMAT
                     ).replace(tzinfo=utc)
                 ).total_seconds(),
-                "statistics": {
-                    "commits_weekly": github_api_client.get_weekly_commits_statistics(
-                        repository_owner, repository_name
-                    ),
-                },
                 "metadata": {
                     "created": datetime.now(tz=utc),
                     "modified": datetime.now(tz=utc),
