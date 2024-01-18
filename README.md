@@ -36,12 +36,14 @@ The data mining uses the GitHub API to gather repositories data. The version use
 https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28
 
 Release
+
 https://docs.github.com/en/rest/commits/commits?apiVersion=2022-11-28
 https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28
 https://docs.github.com/en/rest/branches/branches?apiVersion=2022-11-28
 https://docs.github.com/en/rest/projects/cards?apiVersion=2022-11-28
 
 Code & Community
+
 https://docs.github.com/en/rest/dependency-graph/sboms?apiVersion=2022-11-28
 https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28
 https://docs.github.com/en/rest/metrics/traffic?apiVersion=2022-11-28
@@ -54,6 +56,10 @@ cd data_mining
 
 # Run GitHub repositories mining
 python main.py
+
+# Run GitHub statistics gathering
+# Might need to be re-run since the GitHub API needs time to gather the values
+python statistics.py
 ```
 
 ## Code Formatting
