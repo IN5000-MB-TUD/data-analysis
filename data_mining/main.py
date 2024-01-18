@@ -69,6 +69,12 @@ if __name__ == "__main__":
                 "updated_at": datetime.strptime(
                     github_api_data["updated_at"], DATE_FORMAT
                 ).replace(tzinfo=utc),
+                "age": (
+                    datetime.now(tz=utc)
+                    - datetime.strptime(
+                        github_api_data["created_at"], DATE_FORMAT
+                    ).replace(tzinfo=utc)
+                ).total_seconds(),
                 "metadata": {
                     "created": datetime.now(tz=utc),
                     "modified": datetime.now(tz=utc),
