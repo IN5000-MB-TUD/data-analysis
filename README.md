@@ -55,7 +55,7 @@ Move to the `data_mining` folder and run:
 cd data_mining
 
 # Run GitHub repositories mining
-python main.py
+python repositories.py
 
 # Run GitHub statistics gathering
 # Might need to be re-run since the GitHub API needs time to gather the values
