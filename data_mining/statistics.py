@@ -4,7 +4,7 @@ from datetime import datetime
 from pytz import utc
 
 from connection import mo
-from data_mining.repositories import GitHubAPI
+from connection.github_api import GitHubAPI
 
 # Setup logging
 log = logging.getLogger(__name__)

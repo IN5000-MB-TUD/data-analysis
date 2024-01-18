@@ -1,338 +1,117 @@
+import csv
 import logging
-import os
 from datetime import datetime
 
-import requests
 from pytz import utc
+
+from connection import mo
+from connection.github_api import GitHubAPI
 
 # Setup logging
 log = logging.getLogger(__name__)
 
+DATA_PATH = "../data"
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
+if __name__ == "__main__":
+    log.info("Start GitHub data mining")
+    github_api_client = GitHubAPI()
 
-class GitHubAPI:
-    """GitHubAPI repositories data collector"""
+    # Open repositories list
+    with open(f"{DATA_PATH}/Candidates.csv", newline="") as csv_file:
+        repositories_list_reader = csv.reader(csv_file, delimiter=",")
+        for row in repositories_list_reader:
+            repository_url_split = row[1].split("/")
+            repository_owner = repository_url_split[-2]
+            repository_name = repository_url_split[-1]
 
-    def __init__(self):
-        """Initialize GitHubAPI class"""
-        self.github_api_url = "https://api.github.com/repos/"
-        self.github_auth_token = os.getenv("GITHUB_AUTH_TOKEN")
-        self.github_api_version = "2022-11-28"
-
-    def get_repository_data(self, repository_owner, repository_name):
-        """
-        Get data from GitHub.
-
-        :param repository_owner: The owner of the repository.
-        :param repository_name: The name of the repository.
-        :return: The data from the GitHubAPI as a dictionary. None if an error occurs.
-        """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
+            # Check if the data in te DB is older than 1 day, otherwise skip
+            repository_db_record = mo.db["repositories_data"].find_one(
+                {"name": repository_name, "owner": repository_owner},
             )
-            return None
 
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
-        request_url = self.github_api_url + f"{repository_owner}/{repository_name}"
+            if repository_db_record and (datetime.now(tz=utc) - repository_db_record["metadata"]["modified"]).days < 1:
+                log.info(f"Skipping repository {repository_owner}/{repository_name} since it was updated less than 1 day ago.")
+                continue
 
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
+            github_api_data = github_api_client.get_repository_data(
+                repository_owner, repository_name
             )
-            return None
 
-        return github_api_response.json()
+            if not github_api_data:
+                continue
 
-    def get_repository_contributors(self, repository_owner, repository_name):
-        """
-        Get contributors data from GitHub.
-
-        :param repository_owner: The owner of the repository.
-        :param repository_name: The name of the repository.
-        :return: The contributors data from the GitHubAPI as a dictionary. None if an error occurs.
-        """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
-        request_url = (
-            self.github_api_url + f"{repository_owner}/{repository_name}/contributors"
-        )
-
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-            )
-            return None
-
-        github_repository_contributors = github_api_response.json()
-        repository_contributors = {}
-
-        for contributor in github_repository_contributors:
-            repository_contributors[contributor["login"]] = {
-                "id": contributor["id"],
-                "type": contributor["type"],
-                "admin": contributor["site_admin"],
-                "contributions": contributor["contributions"],
+            repository_data = {
+                "owner": repository_owner,
+                "name": repository_name,
+                "full_name": github_api_data["full_name"],
+                "private": github_api_data["private"],
+                "description": github_api_data["description"],
+                "fork": github_api_data["fork"],
+                "forks_count": github_api_data["forks_count"],
+                "watchers": github_api_data["watchers"],
+                "stargazers_count": github_api_data["stargazers_count"],
+                "size": github_api_data["size"],
+                "default_branch": github_api_data["default_branch"],
+                "open_issues": github_api_data["open_issues"],
+                "is_template": github_api_data["is_template"],
+                "topics": github_api_data["topics"],
+                "has_issues": github_api_data["has_issues"],
+                "has_projects": github_api_data["has_projects"],
+                "has_wiki": github_api_data["has_wiki"],
+                "has_pages": github_api_data["has_pages"],
+                "has_downloads": github_api_data["has_downloads"],
+                "has_discussions": github_api_data["has_discussions"],
+                "archived": github_api_data["archived"],
+                "disabled": github_api_data["disabled"],
+                "subscribers_count": github_api_data["subscribers_count"],
+                "network_count": github_api_data["network_count"],
+                "license": github_api_data["license"]["key"]
+                if github_api_data["license"]
+                else None,
+                "branches": github_api_client.get_repository_branches(
+                    repository_owner, repository_name
+                ),
+                "commits": github_api_client.get_repository_commits_count(
+                    repository_owner, repository_name
+                ),
+                "releases": github_api_client.get_repository_releases(
+                    repository_owner, repository_name
+                ),
+                "contributors": github_api_client.get_repository_contributors(
+                    repository_owner, repository_name
+                ),
+                "languages": github_api_client.get_repository_languages(
+                    repository_owner, repository_name
+                ),
+                "dependencies": github_api_client.get_repository_dependencies_count(
+                    repository_owner, repository_name
+                ),
+                "pushed_at": datetime.strptime(
+                    github_api_data["pushed_at"], DATE_FORMAT
+                ).replace(tzinfo=utc),
+                "created_at": datetime.strptime(
+                    github_api_data["created_at"], DATE_FORMAT
+                ).replace(tzinfo=utc),
+                "updated_at": datetime.strptime(
+                    github_api_data["updated_at"], DATE_FORMAT
+                ).replace(tzinfo=utc),
+                "age": (
+                    datetime.now(tz=utc)
+                    - datetime.strptime(
+                        github_api_data["created_at"], DATE_FORMAT
+                    ).replace(tzinfo=utc)
+                ).total_seconds(),
+                "metadata": {
+                    "created": datetime.now(tz=utc),
+                    "modified": datetime.now(tz=utc),
+                },
             }
 
-        return repository_contributors
-
-    def get_repository_languages(self, repository_owner, repository_name):
-        """
-        Get programming languages data from GitHub.
-        The value shown for each language is the number of bytes of code written in that language.
-
-        :param repository_owner: The owner of the repository.
-        :param repository_name: The name of the repository.
-        :return: The programming languages data from the GitHubAPI as a dictionary. None if an error occurs.
-        """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
+            # Store in DB
+            mo.db["repositories_data"].update_one(
+                {"full_name": github_api_data["full_name"]},
+                {"$set": repository_data},
+                upsert=True,
             )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
-        request_url = (
-            self.github_api_url + f"{repository_owner}/{repository_name}/languages"
-        )
-
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-            )
-            return None
-
-        return github_api_response.json()
-
-    def get_repository_branches(self, repository_owner, repository_name):
-        """
-        Get branches data from GitHub.
-
-        :param repository_owner: The owner of the repository.
-        :param repository_name: The name of the repository.
-        :return: The active branches data from the GitHubAPI as a list. None if an error occurs.
-        """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
-        request_url = (
-            self.github_api_url + f"{repository_owner}/{repository_name}/branches"
-        )
-
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-            )
-            return None
-
-        return {
-            branch["name"]: {"protected": branch["protected"]}
-            for branch in github_api_response.json()
-        }
-
-    def get_repository_commits_count(self, repository_owner, repository_name):
-        """
-        Get commits count from GitHub.
-        The commits are taken from the main branch.
-
-        :param repository_owner: The owner of the repository.
-        :param repository_name: The name of the repository.
-        :return: The commits count from the GitHubAPI. None if an error occurs.
-        """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
-        response_page = 1
-        commits_count = 0
-        commits_to_add = 100
-        request_url = (
-            self.github_api_url
-            + f"{repository_owner}/{repository_name}/commits?per_page=100"
-        )
-
-        while commits_to_add > 0:
-            github_api_response = requests.get(
-                request_url + f"&page={response_page}", headers=headers
-            )
-            if github_api_response.status_code != 200:
-                log.error(
-                    f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-                )
-                return None
-            else:
-                commits_to_add = len(github_api_response.json())
-                commits_count += commits_to_add
-            response_page += 1
-
-        return commits_count
-
-    def get_repository_releases(self, repository_owner, repository_name):
-        """
-        Get releases data from GitHub.
-
-        :param repository_owner: The owner of the repository.
-        :param repository_name: The name of the repository.
-        :return: The releases data from the GitHubAPI as a dictionary. None if an error occurs.
-        """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
-        response_page = 1
-        releases_to_add = 100
-        repository_releases = {}
-        request_url = (
-            self.github_api_url
-            + f"{repository_owner}/{repository_name}/releases?per_page=100"
-        )
-
-        while releases_to_add > 0:
-            github_api_response = requests.get(
-                request_url + f"&page={response_page}", headers=headers
-            )
-            if github_api_response.status_code != 200:
-                log.error(
-                    f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-                )
-                return None
-            else:
-                releases_to_add = len(github_api_response.json())
-                for release in github_api_response.json():
-                    release_name = release["name"] if release["name"] else release["tag_name"]
-                    repository_releases.update(
-                        {
-                            release_name: {
-                                "tag_name": release["tag_name"],
-                                "target": release["target_commitish"],
-                                "body": release["body"],
-                                "draft": release["draft"],
-                                "prerelease": release["prerelease"],
-                                "created_at": datetime.strptime(
-                                    release["created_at"], DATE_FORMAT
-                                ).replace(tzinfo=utc),
-                                "published_at": datetime.strptime(
-                                    release["published_at"], DATE_FORMAT
-                                ).replace(tzinfo=utc),
-                            }
-                        }
-                    )
-            response_page += 1
-
-        return repository_releases
-
-    def get_repository_dependencies_count(self, repository_owner, repository_name):
-        """
-        Get repository dependencies count from GitHub.
-
-        :param repository_owner: The owner of the repository.
-        :param repository_name: The name of the repository.
-        :return: The repository dependencies count from the GitHubAPI. None if an error occurs.
-        """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
-        request_url = (
-            self.github_api_url
-            + f"{repository_owner}/{repository_name}/dependency-graph/sbom"
-        )
-
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-            )
-            return None
-
-        return len(github_api_response.json().get("sbom", {}).get("packages", []))
-
-    def get_weekly_commits_statistics(self, repository_owner, repository_name):
-        """
-        Get weekly commits activity data from GitHub.
-
-        :param repository_owner: The owner of the repository.
-        :param repository_name: The name of the repository.
-        :return: The repository weekly commits activity data from the GitHubAPI as a dictionary. None if an error occurs.
-        """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
-        request_url = (
-            self.github_api_url
-            + f"{repository_owner}/{repository_name}/stats/code_frequency"
-        )
-
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-            )
-            return None
-
-        commits_stats = {}
-        for stats in github_api_response.json():
-            commits_week = datetime.fromtimestamp(stats[0]).replace(tzinfo=utc)
-            commits_additions = stats[1]
-            commits_deletions = abs(stats[2])
-
-            commits_stats[commits_week.strftime(DATE_FORMAT)] = {
-                "timestamp": commits_week,
-                "additions": commits_additions,
-                "deletions": commits_deletions,
-                "total": commits_additions + commits_deletions,
-            }
-
-        return commits_stats
+            log.info(f"Successfully updated {repository_owner}/{repository_name}")
