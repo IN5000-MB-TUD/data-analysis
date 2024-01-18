@@ -60,6 +60,24 @@ if __name__ == "__main__":
                 "license": github_api_data["license"]["key"]
                 if github_api_data["license"]
                 else None,
+                "branches": github_api_client.get_repository_branches(
+                    repository_owner, repository_name
+                ),
+                "commits": github_api_client.get_repository_commits_count(
+                    repository_owner, repository_name
+                ),
+                "releases": github_api_client.get_repository_releases(
+                    repository_owner, repository_name
+                ),
+                "contributors": github_api_client.get_repository_contributors(
+                    repository_owner, repository_name
+                ),
+                "languages": github_api_client.get_repository_languages(
+                    repository_owner, repository_name
+                ),
+                "dependencies": github_api_client.get_repository_dependencies_count(
+                    repository_owner, repository_name
+                ),
                 "pushed_at": datetime.strptime(
                     github_api_data["pushed_at"], DATE_FORMAT
                 ).replace(tzinfo=utc),
@@ -75,6 +93,11 @@ if __name__ == "__main__":
                         github_api_data["created_at"], DATE_FORMAT
                     ).replace(tzinfo=utc)
                 ).total_seconds(),
+                "statistics": {
+                    "commits_weekly": github_api_client.get_weekly_commits_statistics(
+                        repository_owner, repository_name
+                    ),
+                },
                 "metadata": {
                     "created": datetime.now(tz=utc),
                     "modified": datetime.now(tz=utc),
