@@ -30,8 +30,16 @@ if __name__ == "__main__":
                 {"name": repository_name, "owner": repository_owner},
             )
 
-            if repository_db_record and (datetime.now(tz=utc) - repository_db_record["metadata"]["modified"]).days < 1:
-                log.info(f"Skipping repository {repository_owner}/{repository_name} since it was updated less than 1 day ago.")
+            if (
+                repository_db_record
+                and (
+                    datetime.now(tz=utc) - repository_db_record["metadata"]["modified"]
+                ).days
+                < 1
+            ):
+                log.info(
+                    f"Skipping repository {repository_owner}/{repository_name} since it was updated less than 1 day ago."
+                )
                 continue
 
             github_api_data = github_api_client.get_repository_data(
