@@ -336,3 +336,117 @@ class GitHubAPI:
             }
 
         return commits_stats
+
+    def get_repository_stargazers_time(self, repository_owner, repository_name):
+        """
+        Get stargazers time data from GitHub.
+
+        :param repository_owner: The owner of the repository.
+        :param repository_name: The name of the repository.
+        :return: The stargazers time data from the GitHubAPI as a list. None if an error occurs.
+        """
+        if not self.github_auth_token:
+            log.warning(
+                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
+            )
+            return None
+
+        headers = {
+            "Authorization": "Bearer " + self.github_auth_token,
+            "X-GitHub-Api-Version": self.github_api_version,
+        }
+        response_page = 1
+        stargazers_to_add = 100
+        repository_stargazers = []
+        request_url = (
+            self.github_api_url
+            + f"{repository_owner}/{repository_name}/stargazers?per_page=100"
+        )
+
+        while stargazers_to_add > 0:
+            github_api_response = requests.get(
+                request_url + f"&page={response_page}", headers=headers
+            )
+            if github_api_response.status_code != 200:
+                log.error(
+                    f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
+                )
+                return None
+            else:
+                stargazers_to_add = len(github_api_response.json())
+                for stargaze in github_api_response.json():
+                    repository_stargazers.append(
+                        datetime.strptime(
+                            stargaze["starred_at"], DATE_FORMAT
+                        ).replace(tzinfo=utc),
+                    )
+            response_page += 1
+
+        return repository_stargazers
+
+    def get_repository_issues_time(self, repository_owner, repository_name):
+        """
+        Get issues time data from GitHub.
+
+        :param repository_owner: The owner of the repository.
+        :param repository_name: The name of the repository.
+        :return: The issues time data from the GitHubAPI as a dictionary. None if an error occurs.
+        """
+        if not self.github_auth_token:
+            log.warning(
+                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
+            )
+            return None
+
+        headers = {
+            "Authorization": "Bearer " + self.github_auth_token,
+            "X-GitHub-Api-Version": self.github_api_version,
+        }
+        response_page = 1
+        issues_to_add = 100
+        repository_issues = {}
+        request_url = (
+            self.github_api_url
+            + f"{repository_owner}/{repository_name}/issues?per_page=100"
+        )
+
+        while issues_to_add > 0:
+            github_api_response = requests.get(
+                request_url + f"&page={response_page}", headers=headers
+            )
+            if github_api_response.status_code != 200:
+                log.error(
+                    f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
+                )
+                return None
+            else:
+                issues_to_add = len(github_api_response.json())
+                for issue in github_api_response.json():
+                    repository_issues.update(
+                        {
+                            "issue_{}".format(issue["number"]): {
+                                "id": issue["id"],
+                                "number": issue["number"],
+                                "state": issue["state"],
+                                "title": issue["title"],
+                                "body": issue["body"],
+                                "user": issue["user"]["login"],
+                                "labels": {label["name"]: label["description"] for label in issue["labels"]},
+                                "comments": issue["comments"],
+                                "created_at": datetime.strptime(
+                                    issue["created_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc),
+                                "updated_at": datetime.strptime(
+                                    issue["updated_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc),
+                                "closed_at": datetime.strptime(
+                                    issue["closed_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc) if issue["closed_at"] else None,
+                                "author_association": issue["author_association"],
+                                "state_reason": issue["state_reason"],
+                            }
+                        }
+                    )
+            response_page += 1
+
+        return repository_issues
