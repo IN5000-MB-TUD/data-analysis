@@ -238,7 +238,9 @@ class GitHubAPI:
             else:
                 releases_to_add = len(github_api_response.json())
                 for release in github_api_response.json():
-                    release_name = release["name"] if release["name"] else release["tag_name"]
+                    release_name = (
+                        release["name"] if release["name"] else release["tag_name"]
+                    )
                     repository_releases.update(
                         {
                             release_name: {
@@ -375,11 +377,12 @@ class GitHubAPI:
             else:
                 stargazers_to_add = len(github_api_response.json())
                 for stargaze in github_api_response.json():
-                    repository_stargazers.append(
-                        datetime.strptime(
-                            stargaze["starred_at"], DATE_FORMAT
-                        ).replace(tzinfo=utc),
-                    )
+                    if stargaze.get("starred_at"):
+                        repository_stargazers.append(
+                            datetime.strptime(
+                                stargaze["starred_at"], DATE_FORMAT
+                            ).replace(tzinfo=utc),
+                        )
             response_page += 1
 
         return repository_stargazers
@@ -431,7 +434,10 @@ class GitHubAPI:
                                 "title": issue["title"],
                                 "body": issue["body"],
                                 "user": issue["user"]["login"],
-                                "labels": {label["name"]: label["description"] for label in issue["labels"]},
+                                "labels": {
+                                    label["name"]: label["description"]
+                                    for label in issue["labels"]
+                                },
                                 "comments": issue["comments"],
                                 "created_at": datetime.strptime(
                                     issue["created_at"], DATE_FORMAT
@@ -441,7 +447,9 @@ class GitHubAPI:
                                 ).replace(tzinfo=utc),
                                 "closed_at": datetime.strptime(
                                     issue["closed_at"], DATE_FORMAT
-                                ).replace(tzinfo=utc) if issue["closed_at"] else None,
+                                ).replace(tzinfo=utc)
+                                if issue["closed_at"]
+                                else None,
                                 "author_association": issue["author_association"],
                                 "state_reason": issue["state_reason"],
                             }
