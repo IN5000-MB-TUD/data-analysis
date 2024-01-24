@@ -356,7 +356,7 @@ class GitHubAPI:
         headers = {
             "Authorization": "Bearer " + self.github_auth_token,
             "X-GitHub-Api-Version": self.github_api_version,
-            "Accept": "application/vnd.github.v3.star+json"
+            "Accept": "application/vnd.github.v3.star+json",
         }
         response_page = 1
         stargazers_to_add = 100
