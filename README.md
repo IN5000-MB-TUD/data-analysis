@@ -62,6 +62,18 @@ python repositories.py
 python statistics.py
 ```
 
+### Data Processing
+
+Move to the `data_processing` folder and run:
+
+```shell
+# Move to the data_processing folder
+cd data_processing
+
+# Generate Plots for statistics
+python time_series.py
+```
+
 ## Code Formatting
 
 To ensure high code quality, the Black formatted can be run as follows:
