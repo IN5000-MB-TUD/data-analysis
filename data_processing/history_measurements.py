@@ -1,4 +1,7 @@
 import logging
+from datetime import datetime
+
+from pytz import utc
 
 from connection import mo
 from data_processing.utils import (
@@ -51,6 +54,10 @@ if __name__ == "__main__":
                 {
                     "$set": {
                         "releases_history_metrics": releases_history_metrics,
+                        "metadata": {
+                            "created": datetime.now(tz=utc),
+                            "modified": datetime.now(tz=utc),
+                        },
                     }
                 },
                 upsert=True,
