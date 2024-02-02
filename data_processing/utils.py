@@ -214,3 +214,23 @@ def compute_releases_history_metrics(releases_statistics, properties=None):
                 properties_metrics[property_key]["EEP"] = None
 
     return properties_metrics
+
+
+def compute_time_series_segments_trends(time_series):
+    """Compute the segments trends in a time series"""
+    segments_trends = []
+    for i in range(1, len(time_series)):
+        previous_idx = i - 1
+        current_idx = i
+
+        trend_timestamp = time_series[current_idx][0]
+        if time_series[previous_idx][1] < time_series[current_idx][1]:
+            trend_status = 1
+        elif time_series[previous_idx][1] == time_series[current_idx][1]:
+            trend_status = 0
+        else:
+            trend_status = -1
+
+        segments_trends.append((trend_timestamp, trend_status))
+
+    return segments_trends
