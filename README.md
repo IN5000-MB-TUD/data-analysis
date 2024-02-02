@@ -71,7 +71,13 @@ Move to the `data_processing` folder and run:
 cd data_processing
 
 # Generate Plots for statistics
-python time_series.py
+python time_series_plot.py
+
+# Time series segmentation and similarity
+python time_series_segmentation.py
+
+# History measurements
+python history_measurements.py
 ```
 
 ## Code Formatting
