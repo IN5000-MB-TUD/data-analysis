@@ -8,6 +8,7 @@ from data_processing.utils import (
     get_issues_time_series,
     get_additions_deletions_time_series,
     compute_time_series_segments_trends,
+    compute_pattern_distance,
 )
 
 # Setup logging
@@ -23,8 +24,12 @@ if __name__ == "__main__":
     # Get the repositories in the database
     repositories = mo.db["repositories_data"].find()
 
+    repository_sequences = {}
+
     for idx, repository in enumerate(repositories):
         log.info("Analyzing repository {}".format(repository["full_name"]))
+
+        repository_sequences[repository["full_name"]] = {}
 
         # Compute the k amount of perceptually important points (PIP) based on the repository age
         # Get number of months
@@ -49,6 +54,9 @@ if __name__ == "__main__":
             stargazers_pip = pip(stargazers_time_series, k)
 
             stargazers_trends = compute_time_series_segments_trends(stargazers_pip)
+            repository_sequences[repository["full_name"]][
+                "stargazers_trends"
+            ] = stargazers_trends
 
         # Process open issues
         if (
@@ -65,6 +73,9 @@ if __name__ == "__main__":
             issues_pip = pip(issues_time_series, k)
 
             issues_trends = compute_time_series_segments_trends(issues_pip)
+            repository_sequences[repository["full_name"]][
+                "issues_trends"
+            ] = issues_trends
 
         # Process Weekly Commits Stats
         if repository.get("statistics", {}).get("commits_weekly"):
@@ -97,4 +108,49 @@ if __name__ == "__main__":
             additions_trends = compute_time_series_segments_trends(additions_pip)
             deletions_trends = compute_time_series_segments_trends(deletions_pip)
 
+            repository_sequences[repository["full_name"]][
+                "changes_trends"
+            ] = changes_trends
+            repository_sequences[repository["full_name"]][
+                "additions_trends"
+            ] = additions_trends
+            repository_sequences[repository["full_name"]][
+                "deletions_trends"
+            ] = deletions_trends
+
         log.info("------------------------")
+
+    log.info("Start computation of pattern distances")
+    pattern_distance_matrix = {}
+
+    for repo_1_key, repo_1_values in repository_sequences.items():
+        pattern_distance_matrix[repo_1_key] = {}
+        for repo_2_key, repo_2_values in repository_sequences.items():
+            # Avoid computing for the same repo
+            if repo_1_key == repo_2_key:
+                pattern_distance_matrix[repo_1_key][repo_2_key] = {
+                    "stargazers": 0,
+                    "issues": 0,
+                    "changes": 0,
+                    "additions": 0,
+                    "deletions": 0,
+                }
+                continue
+
+            pattern_distance_matrix[repo_1_key][repo_2_key] = {}
+
+            # Loop through repository available values
+            for trend_key, trend_sequence in repo_1_values.items():
+                if trend_key in repo_2_values:
+                    pattern_distance_matrix[repo_1_key][repo_2_key][
+                        trend_key
+                    ] = compute_pattern_distance(
+                        trend_sequence, repo_2_values[trend_key]
+                    )
+                else:
+                    pattern_distance_matrix[repo_1_key][repo_2_key][trend_key] = None
+
+    # Store in DB
+    mo.db["repositories_pattern_distance"].insert_one(pattern_distance_matrix)
+
+    log.info("Pattern distance matrix computation completed")
