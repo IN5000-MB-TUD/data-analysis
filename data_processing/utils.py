@@ -234,3 +234,58 @@ def compute_time_series_segments_trends(time_series):
         segments_trends.append((trend_timestamp, trend_status))
 
     return segments_trends
+
+
+def merge_segments_trends(trend_1, trend_2):
+    """Merge two segment trends to align the time sequence"""
+    trend_1_times = [t for (t, _) in trend_1]
+    trend_2_times = [t for (t, _) in trend_2]
+
+    trends_times = trend_1_times + list(set(trend_2_times) - set(trend_1_times))
+    trends_times.sort()
+
+    trends_1_adjusted = []
+    trends_2_adjusted = []
+
+    trends_1_idx = 0
+    trends_2_idx = 0
+
+    for trend_timestamp in trends_times:
+        # Trends 1
+        if trends_1_idx < len(trend_1):
+            if trend_timestamp <= trend_1[trends_1_idx][0]:
+                trends_1_adjusted.append((trend_timestamp, trend_1[trends_1_idx][1]))
+            else:
+                trends_1_adjusted.append((trend_timestamp, trend_1[trends_1_idx][1]))
+                trends_1_idx += 1
+        else:
+            trends_1_adjusted.append((trend_timestamp, trend_1[-1][1]))
+
+        # Trends 2
+        if trends_2_idx < len(trend_2):
+            if trend_timestamp <= trend_2[trends_2_idx][0]:
+                trends_2_adjusted.append((trend_timestamp, trend_2[trends_2_idx][1]))
+            else:
+                trends_2_adjusted.append((trend_timestamp, trend_2[trends_2_idx][1]))
+                trends_2_idx += 1
+        else:
+            trends_2_adjusted.append((trend_timestamp, trend_2[-1][1]))
+
+    return trends_1_adjusted, trends_2_adjusted
+
+
+def compute_pattern_distance(trend_1, trend_2):
+    """Compute pattern distance between two trends"""
+    # Align trends times
+    trends_1_adjusted, trends_2_adjusted = merge_segments_trends(trend_1, trend_2)
+
+    pattern_distance = 0
+    for i in range(1, len(trends_1_adjusted)):
+        pattern_distance += (
+            trends_1_adjusted[i][0] - trends_1_adjusted[i - 1][0]
+        ) * abs(trends_1_adjusted[i][1] - trends_2_adjusted[i][1])
+
+    # Divide by latest timestamp
+    pattern_distance /= trends_1_adjusted[-1][0]
+
+    return pattern_distance
