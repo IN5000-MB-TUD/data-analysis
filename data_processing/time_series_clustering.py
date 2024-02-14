@@ -1,5 +1,6 @@
 import logging
 import pandas as pd
+from fastpip import pip
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
@@ -7,7 +8,10 @@ from tsfresh import extract_features
 from tsfresh.feature_extraction import MinimalFCParameters
 
 from connection import mo
-from data_processing.utils import get_stargazers_time_series
+from data_processing.utils import (
+    get_stargazers_time_series,
+    compute_time_series_segments_trends,
+)
 
 # Setup logging
 log = logging.getLogger(__name__)
@@ -28,15 +32,32 @@ if __name__ == "__main__":
     for idx, repository in enumerate(repositories):
         log.info("Analyzing repository {}".format(repository["full_name"]))
 
+        # Compute the k amount of perceptually important points (PIP) based on the repository age
+        # Get number of months
+        k = int(repository["age"] / 2.628e6)
+
+        # If too low, get number of weeks
+        if k == 0:
+            k = int(repository["age"] / 604800)
+
         # Process stargazers
         if (
             repository.get("statistics", {}).get("stargazers")
             and repository["stargazers_count"] > 0
         ):
             stargazers, stargazers_cumulative = get_stargazers_time_series(repository)
-            stargazers_tuples = [
-                (stargazers[i], repository["full_name"], stargazers_cumulative[i])
+            # Create list of points (x, y) => (time_ms, stargazers_count)
+            stargazers_time_series = [
+                (int(stargazers[i].timestamp()), stargazers_cumulative[i])
                 for i in range(len(stargazers))
+            ]
+            stargazers_pip = pip(stargazers_time_series, k)
+
+            stargazers_trends = compute_time_series_segments_trends(stargazers_pip)
+
+            stargazers_tuples = [
+                (trend[0], repository["full_name"], trend[1])
+                for trend in stargazers_trends
             ]
 
             stargazers_df = pd.DataFrame(
