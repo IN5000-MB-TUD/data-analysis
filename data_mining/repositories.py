@@ -129,6 +129,8 @@ if __name__ == "__main__":
                 log.info(f"Successfully updated {repository_owner}/{repository_name}")
                 repos_counter += 1
             except DuplicateKeyError as e:
-                log.error(f"DuplicateKeyError when updating {repository_owner}/{repository_name}")
+                log.error(
+                    f"DuplicateKeyError when updating {repository_owner}/{repository_name}"
+                )
 
     log.info(f"Successfully mined {repos_counter} repositories")
