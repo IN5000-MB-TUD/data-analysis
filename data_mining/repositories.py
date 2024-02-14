@@ -2,6 +2,7 @@ import csv
 import logging
 from datetime import datetime
 
+from pymongo.errors import DuplicateKeyError
 from pytz import utc
 
 from connection import mo
@@ -12,13 +13,15 @@ log = logging.getLogger(__name__)
 
 DATA_PATH = "../data"
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+REPOSITORIES_FILE = "OriginURLMainDatasetSOuPatleast100Cards.csv"
 
 if __name__ == "__main__":
     log.info("Start GitHub data mining")
     github_api_client = GitHubAPI()
+    repos_counter = 0
 
     # Open repositories list
-    with open(f"{DATA_PATH}/Candidates.csv", newline="") as csv_file:
+    with open(f"{DATA_PATH}/{REPOSITORIES_FILE}", newline="") as csv_file:
         repositories_list_reader = csv.reader(csv_file, delimiter=",")
         for row in repositories_list_reader:
             repository_url_split = row[1].split("/")
@@ -117,9 +120,15 @@ if __name__ == "__main__":
             }
 
             # Store in DB
-            mo.db["repositories_data"].update_one(
-                {"full_name": github_api_data["full_name"]},
-                {"$set": repository_data},
-                upsert=True,
-            )
-            log.info(f"Successfully updated {repository_owner}/{repository_name}")
+            try:
+                mo.db["repositories_data"].update_one(
+                    {"full_name": github_api_data["full_name"]},
+                    {"$set": repository_data},
+                    upsert=True,
+                )
+                log.info(f"Successfully updated {repository_owner}/{repository_name}")
+                repos_counter += 1
+            except DuplicateKeyError as e:
+                log.error(f"DuplicateKeyError when updating {repository_owner}/{repository_name}")
+
+    log.info(f"Successfully mined {repos_counter} repositories")
