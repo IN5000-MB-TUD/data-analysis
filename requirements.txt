@@ -3,3 +3,5 @@ pytz==2023.3.post1
 requests==2.31.0
 matplotlib==3.8.2
 python-fastpip==1.2
+pandas==2.2.0
+tsfresh==0.20.2
