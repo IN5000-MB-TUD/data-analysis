@@ -1,5 +1,6 @@
 import logging
 
+import joblib
 import numpy as np
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
@@ -108,9 +109,14 @@ if __name__ == "__main__":
         f"Optimal number of clusters is: {clusters} with silhouette_score: {best_fit}"
     )
 
+    # Save model
     model = ClusterWrapper(
         n_clusters=clusters, model_type=model_type, transform_type=transform_type
     )
+    model.model.fit(df_feats)
+    joblib.dump(model, f"../models/clustering/mts_clustering_{len(repositories_names)}_repos.pickle")
+
+    # Print clustered repos
     log.info(model.fit_predict(df_feats))
     clustered_repositories = model.fit_predict(df_feats)
     clusters = {}
