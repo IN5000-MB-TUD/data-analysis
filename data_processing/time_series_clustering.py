@@ -1,13 +1,19 @@
 import logging
-import pandas as pd
-from sklearn.cluster import KMeans
+
+import numpy as np
 from sklearn.metrics import silhouette_score
 from sklearn.preprocessing import StandardScaler
-from tsfresh import extract_features
-from tsfresh.feature_extraction import MinimalFCParameters
 
 from connection import mo
-from data_processing.utils import get_stargazers_time_series
+from data_processing.t2f.extraction.extractor import feature_extraction
+from data_processing.t2f.model.clustering import ClusterWrapper
+from data_processing.t2f.selection.selection import feature_selection
+from data_processing.utils import (
+    get_stargazers_time_series,
+    build_time_series,
+    get_issues_time_series,
+    get_additions_deletions_time_series,
+)
 
 # Setup logging
 log = logging.getLogger(__name__)
@@ -20,63 +26,103 @@ if __name__ == "__main__":
     log.info("Start GitHub statistics retrieval from Database")
 
     # Get the repositories in the database
-    repositories = mo.db["repositories_data"].find()
+    repositories = mo.db["repositories_data"].find({"statistics": {"$exists": True}})
+    repositories_names = []
 
-    repository_sequences = {}
-    stargazers_features = pd.DataFrame()
+    repos_matrix_pairs = []
+    repos_matrix_single = []
 
     for idx, repository in enumerate(repositories):
         log.info("Analyzing repository {}".format(repository["full_name"]))
 
-        # Process stargazers
-        if (
-            repository.get("statistics", {}).get("stargazers")
-            and repository["stargazers_count"] > 0
-        ):
+        repositories_names.append(repository["full_name"])
+
+        if repository["statistics"].get("stargazers", []):
             stargazers, stargazers_cumulative = get_stargazers_time_series(repository)
-            stargazers_tuples = [
-                (stargazers[i], repository["full_name"], stargazers_cumulative[i])
-                for i in range(len(stargazers))
+        else:
+            stargazers, stargazers_cumulative = build_time_series(
+                repository, "stargazers_count"
+            )
+
+        if repository["statistics"].get("issues", []):
+            issues_dates, issues_cumulative = get_issues_time_series(repository)
+        else:
+            issues_dates, issues_cumulative = build_time_series(
+                repository, "open_issues"
+            )
+
+        if repository["statistics"].get("commits_weekly", []):
+            (
+                commits_dates,
+                commits_cumulative,
+                _,
+                _,
+            ) = get_additions_deletions_time_series(repository)
+        else:
+            commits_dates, commits_cumulative = build_time_series(repository, "commits")
+
+        repos_matrix_pairs.append(
+            [
+                zip(stargazers, stargazers_cumulative),
+                zip(issues_dates, issues_cumulative),
+                zip(commits_dates, commits_cumulative),
             ]
+        )
+        repos_matrix_single.append(
+            [
+                zip(stargazers, stargazers_cumulative),
+                zip(issues_dates, issues_cumulative),
+                zip(commits_dates, commits_cumulative),
+            ]
+        )
 
-            stargazers_df = pd.DataFrame(
-                stargazers_tuples, columns=["Date", "Repository", "Stargazers"]
-            )
-            extracted_features = extract_features(
-                stargazers_df,
-                column_id="Repository",
-                column_sort="Date",
-                default_fc_parameters=MinimalFCParameters(),
-            )
-            stargazers_features = pd.concat(
-                [stargazers_features, extracted_features], ignore_index=False
-            )
+    # Feature extraction
+    df_feats = feature_extraction(
+        np.array(repos_matrix_pairs), np.array(repos_matrix_single), batch_size=100, p=1
+    )
 
-    # Cluster the repositories stargazers features data
+    transform_type = "std"  # preprocessing step
+    model_type = "Hierarchical"  # clustering model
+
+    # Feature selection
+    # context = {'model_type': model_type, 'transform_type': transform_type}
+    # top_feats = feature_selection(df_feats, labels={}, context=context)
+    # df_feats = df_feats[top_feats]
+
+    # Scale features
     prep = StandardScaler()
-    scaled_data = prep.fit_transform(stargazers_features)
+    df_feats = prep.fit_transform(df_feats)
 
-    # Get optimal clusters number
-    clusters = 2
+    # Clustering
     best_fit = -1
-    for n_cluster in range(2, len(stargazers_features.index)):
-        kmeans = KMeans(n_clusters=n_cluster, random_state=0)
-        kmeans.fit(scaled_data)
-        if silhouette_score(scaled_data, kmeans.labels_) > best_fit:
-            best_fit = silhouette_score(scaled_data, kmeans.labels_)
+    clusters = 2
+    for n_cluster in range(2, len(repositories_names)):
+        model = ClusterWrapper(
+            n_clusters=n_cluster, model_type=model_type, transform_type=transform_type
+        )
+        model.model.fit(df_feats)
+        if silhouette_score(df_feats, model.model.labels_) > best_fit:
+            best_fit = silhouette_score(df_feats, model.model.labels_)
             clusters = n_cluster
     log.info(
         f"Optimal number of clusters is: {clusters} with silhouette_score: {best_fit}"
     )
 
-    kmeans = KMeans(n_clusters=clusters, random_state=0)
-    kmeans.fit(scaled_data)
+    model = ClusterWrapper(
+        n_clusters=clusters, model_type=model_type, transform_type=transform_type
+    )
+    log.info(model.fit_predict(df_feats))
+    clustered_repositories = model.fit_predict(df_feats)
+    clusters = {}
+    for idx, cluster_id in enumerate(clustered_repositories):
+        cluster_list = clusters.get(f"Cluster_{cluster_id}", [])
+        cluster_list.append(repositories_names[idx])
+        clusters[f"Cluster_{cluster_id}"] = cluster_list
 
-    for cluster in range(kmeans.n_clusters):
-        log.info(f"Cluster {cluster}")
-        cluster_data = stargazers_features[kmeans.labels_ == cluster]
-        for i in range(min(5, cluster_data.shape[0])):
-            log.info(cluster_data.index[i])
-        log.info("")
+    for cluster, repos in clusters.items():
+        log.info(cluster)
+        for repo in repos:
+            log.info(repo)
+        log.info("-----------------")
 
     log.info("Successfully clustered repositories time series")
