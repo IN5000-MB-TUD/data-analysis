@@ -2,8 +2,10 @@ import logging
 
 import joblib
 import numpy as np
+from matplotlib import pyplot as plt
+from scipy.cluster.hierarchy import dendrogram
 from sklearn.metrics import silhouette_score
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 
 from connection import mo
 from data_processing.t2f.extraction.extractor import feature_extraction
@@ -91,7 +93,7 @@ if __name__ == "__main__":
     # df_feats = df_feats[top_feats]
 
     # Scale features
-    prep = StandardScaler()
+    prep = MinMaxScaler()
     df_feats = prep.fit_transform(df_feats)
 
     # Clustering
@@ -117,8 +119,8 @@ if __name__ == "__main__":
     joblib.dump(model, f"../models/clustering/mts_clustering_{len(repositories_names)}_repos.pickle")
 
     # Print clustered repos
-    log.info(model.fit_predict(df_feats))
     clustered_repositories = model.fit_predict(df_feats)
+    log.info(clustered_repositories)
     clusters = {}
     for idx, cluster_id in enumerate(clustered_repositories):
         cluster_list = clusters.get(f"Cluster_{cluster_id}", [])
@@ -130,5 +132,28 @@ if __name__ == "__main__":
         for repo in repos:
             log.info(repo)
         log.info("-----------------")
+
+    # Plot Dendogram
+    # Create the counts of samples under each node
+    plt.title("Hierarchical Clustering Dendrogram")
+    counts = np.zeros(model.model.children_.shape[0])
+    n_samples = len(model.model.labels_)
+    for i, merge in enumerate(model.model.children_):
+        current_count = 0
+        for child_idx in merge:
+            if child_idx < n_samples:
+                current_count += 1  # leaf node
+            else:
+                current_count += counts[child_idx - n_samples]
+        counts[i] = current_count
+
+    linkage_matrix = np.column_stack(
+        [model.model.children_, model.model.distances_, counts]
+    ).astype(float)
+
+    # Plot the corresponding dendrogram
+    dendrogram(linkage_matrix, truncate_mode="level", p=4)
+    plt.xlabel("Number of points in node (or index of point if no parenthesis).")
+    plt.show()
 
     log.info("Successfully clustered repositories time series")

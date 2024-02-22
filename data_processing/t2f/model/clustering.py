@@ -10,10 +10,14 @@ from sklearn.metrics.cluster import (
 from .preprocessing import get_transformer
 
 
-def _define_model(model_type: str, num_cluster: int):
+def _define_model(model_type: str, num_cluster: [int, None]):
     """Define the clustering model"""
     if model_type == "Hierarchical":
-        model = AgglomerativeClustering(n_clusters=num_cluster)
+        if not num_cluster:
+            # Setting distance_threshold=0 ensures we compute the full tree.
+            model = AgglomerativeClustering(n_clusters=num_cluster, distance_threshold=0, compute_distances=True)
+        else:
+            model = AgglomerativeClustering(n_clusters=num_cluster, compute_distances=True)
     elif model_type == "KMeans":
         model = KMeans(n_clusters=num_cluster, n_init=10)
     elif model_type == "Spectral":
@@ -38,7 +42,7 @@ class ClusterWrapper(object):
 
     def __init__(
         self,
-        n_clusters: int,
+        n_clusters: [int, None],
         model_type: str,
         transform_type: str = None,
         normalize: bool = False,
