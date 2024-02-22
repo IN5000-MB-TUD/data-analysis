@@ -263,6 +263,10 @@ def compute_time_series_segments_trends(time_series):
 
 def merge_segments_trends(trend_1, trend_2):
     """Merge two segment trends to align the time sequence"""
+    if not trend_1 and not trend_2:
+        current_time = int(datetime.now(tz=utc).timestamp())
+        return [(current_time, 0)], [(current_time, 0)]
+
     trend_1_times = [t for (t, _) in trend_1]
     trend_2_times = [t for (t, _) in trend_2]
 
@@ -274,6 +278,13 @@ def merge_segments_trends(trend_1, trend_2):
 
     trends_1_idx = 0
     trends_2_idx = 0
+
+    # Make sure that the lists are populated
+    if not trend_1:
+        trend_1 = [(trends_times[0], 0)]
+
+    if not trend_2:
+        trend_2 = [(trends_times[0], 0)]
 
     for trend_timestamp in trends_times:
         # Trends 1
