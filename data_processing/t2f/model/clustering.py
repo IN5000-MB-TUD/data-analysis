@@ -15,9 +15,13 @@ def _define_model(model_type: str, num_cluster: [int, None]):
     if model_type == "Hierarchical":
         if not num_cluster:
             # Setting distance_threshold=0 ensures we compute the full tree.
-            model = AgglomerativeClustering(n_clusters=num_cluster, distance_threshold=0, compute_distances=True)
+            model = AgglomerativeClustering(
+                n_clusters=num_cluster, distance_threshold=0, compute_distances=True
+            )
         else:
-            model = AgglomerativeClustering(n_clusters=num_cluster, compute_distances=True)
+            model = AgglomerativeClustering(
+                n_clusters=num_cluster, compute_distances=True
+            )
     elif model_type == "KMeans":
         model = KMeans(n_clusters=num_cluster, n_init=10)
     elif model_type == "Spectral":

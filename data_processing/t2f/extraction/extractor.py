@@ -7,7 +7,11 @@ import multiprocessing as mp
 
 from data_processing.t2f.extraction.extractor_pair import extract_pair_features
 from data_processing.t2f.extraction.extractor_single import extract_univariate_features
-from data_processing.utils import merge_time_series, compute_time_series_segments_trends, compute_pattern_distance
+from data_processing.utils import (
+    merge_time_series,
+    compute_time_series_segments_trends,
+    compute_pattern_distance,
+)
 
 
 def padding_series(ts_list: list):
@@ -110,8 +114,14 @@ def extract_pair_series_features(mts: np.array):
         mts_i, mts_j = merge_time_series(list(mts[i]), list(mts[j]))
 
         # Convert datetimes to timestamps
-        mts_i = [(int(mts_i_time.timestamp()), mts_i_value) for mts_i_time, mts_i_value in mts_i]
-        mts_j = [(int(mts_j_time.timestamp()), mts_j_value) for mts_j_time, mts_j_value in mts_j]
+        mts_i = [
+            (int(mts_i_time.timestamp()), mts_i_value)
+            for mts_i_time, mts_i_value in mts_i
+        ]
+        mts_j = [
+            (int(mts_j_time.timestamp()), mts_j_value)
+            for mts_j_time, mts_j_value in mts_j
+        ]
 
         # Compute segments
         mts_i_segments = compute_time_series_segments_trends(mts_i)
