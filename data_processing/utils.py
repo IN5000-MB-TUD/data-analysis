@@ -1,4 +1,7 @@
+from datetime import timedelta, datetime
+
 import matplotlib.pyplot as plt
+from pytz import utc
 
 
 def create_plot(path, title, subtitle, xlabel, ylabel, x, y, labels=None):
@@ -60,7 +63,7 @@ def get_stargazers_time_series(repository):
         stargazers_cumulative.append(stargazers_counter)
 
     stargazers_cumulative.append(repository["stargazers_count"])
-    stargazers.append(repository["updated_at"])
+    stargazers.append(repository["metadata"]["modified"])
 
     return stargazers, stargazers_cumulative
 
@@ -107,6 +110,28 @@ def get_additions_deletions_time_series(repository):
         deletions_cumulative.append(deletions_counter)
 
     return commits_dates, commits_cumulative, additions_cumulative, deletions_cumulative
+
+
+def build_time_series(repository, max_count_key):
+    """Build time series based on repository age and variable max value"""
+    if repository[max_count_key] == 0:
+        return [], []
+
+    variable_timestamps = []
+    variable_cumulative = []
+    variable_counter = 0
+    stargazers_time_delta = timedelta(
+        seconds=int(repository["age"] / repository[max_count_key])
+    )
+    time_counter = repository["created_at"]
+    while time_counter < repository["metadata"]["modified"]:
+        variable_timestamps.append(time_counter)
+        variable_cumulative.append(variable_counter)
+
+        variable_counter += 1
+        time_counter += stargazers_time_delta
+
+    return variable_timestamps, variable_cumulative
 
 
 def create_releases_statistics_dictionary(releases, repository):
@@ -238,6 +263,10 @@ def compute_time_series_segments_trends(time_series):
 
 def merge_segments_trends(trend_1, trend_2):
     """Merge two segment trends to align the time sequence"""
+    if not trend_1 and not trend_2:
+        current_time = int(datetime.now(tz=utc).timestamp())
+        return [(current_time, 0)], [(current_time, 0)]
+
     trend_1_times = [t for (t, _) in trend_1]
     trend_2_times = [t for (t, _) in trend_2]
 
@@ -249,6 +278,13 @@ def merge_segments_trends(trend_1, trend_2):
 
     trends_1_idx = 0
     trends_2_idx = 0
+
+    # Make sure that the lists are populated
+    if not trend_1:
+        trend_1 = [(trends_times[0], 0)]
+
+    if not trend_2:
+        trend_2 = [(trends_times[0], 0)]
 
     for trend_timestamp in trends_times:
         # Trends 1
@@ -270,6 +306,55 @@ def merge_segments_trends(trend_1, trend_2):
                 trends_2_adjusted.append((trend_timestamp, 0))
         else:
             trends_2_adjusted.append((trend_timestamp, 0))
+
+    return trends_1_adjusted, trends_2_adjusted
+
+
+def merge_time_series(trend_1, trend_2):
+    """Merge two time series to align the time sequence"""
+    if not trend_1 and not trend_2:
+        current_time = datetime.now(tz=utc)
+        return [(current_time, 0)], [(current_time, 0)]
+
+    trend_1_times = [t for (t, _) in trend_1]
+    trend_2_times = [t for (t, _) in trend_2]
+
+    trends_times = trend_1_times + list(set(trend_2_times) - set(trend_1_times))
+    trends_times.sort()
+
+    trends_1_adjusted = []
+    trends_2_adjusted = []
+
+    trends_1_idx = 0
+    trends_2_idx = 0
+
+    # Make sure that the lists are populated
+    if not trend_1:
+        trend_1 = [(trends_times[0], 0)]
+
+    if not trend_2:
+        trend_2 = [(trends_times[0], 0)]
+
+    for trend_timestamp in trends_times:
+        # Trends 1
+        if trends_1_idx < len(trend_1):
+            if trend_timestamp == trend_1[trends_1_idx][0]:
+                trends_1_adjusted.append((trend_timestamp, trend_1[trends_1_idx][1]))
+                trends_1_idx += 1
+            else:
+                trends_1_adjusted.append((trend_timestamp, trend_1[trends_1_idx][1]))
+        else:
+            trends_1_adjusted.append((trend_timestamp, trend_1[-1][1]))
+
+        # Trends 2
+        if trends_2_idx < len(trend_2):
+            if trend_timestamp == trend_2[trends_2_idx][0]:
+                trends_2_adjusted.append((trend_timestamp, trend_2[trends_2_idx][1]))
+                trends_2_idx += 1
+            else:
+                trends_2_adjusted.append((trend_timestamp, trend_2[trends_2_idx][1]))
+        else:
+            trends_2_adjusted.append((trend_timestamp, trend_2[-1][1]))
 
     return trends_1_adjusted, trends_2_adjusted
 
