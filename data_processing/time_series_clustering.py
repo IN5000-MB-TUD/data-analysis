@@ -116,7 +116,10 @@ if __name__ == "__main__":
         n_clusters=clusters, model_type=model_type, transform_type=transform_type
     )
     model.model.fit(df_feats)
-    joblib.dump(model, f"../models/clustering/mts_clustering_{len(repositories_names)}_repos.pickle")
+    joblib.dump(
+        model,
+        f"../models/clustering/mts_clustering_{len(repositories_names)}_repos.pickle",
+    )
 
     # Print clustered repos
     clustered_repositories = model.fit_predict(df_feats)
