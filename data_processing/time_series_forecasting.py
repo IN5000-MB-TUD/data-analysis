@@ -1,25 +1,32 @@
 import logging
+from datetime import timedelta
+from math import ceil
 from pathlib import Path
 
 import pandas as pd
 from mlforecast import MLForecast
+from mlforecast.target_transforms import Differences
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import make_pipeline
-from window_ops.rolling import rolling_mean, rolling_min, rolling_max
+from utilsforecast.plotting import plot_series
 from xgboost import XGBRegressor
 
 from connection import mo
-from data_processing.utils import get_stargazers_time_series, build_time_series, get_issues_time_series, \
-    get_additions_deletions_time_series, merge_time_series
+from data_processing.utils import (
+    get_stargazers_time_series,
+    build_time_series,
+    get_issues_time_series,
+    get_additions_deletions_time_series,
+    merge_time_series,
+)
 
 # Setup logging
 log = logging.getLogger(__name__)
 
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-DATE_SPLIT = "2023-01-01"
-FORECAST_HORIZON_WEEKS = 4
+FORECAST_HORIZON_MONTHS = 12
 
 
 if __name__ == "__main__":
@@ -35,7 +42,9 @@ if __name__ == "__main__":
             log.info("Analyzing repository {}".format(repository["full_name"]))
 
             if repository["statistics"].get("stargazers", []):
-                stargazers, stargazers_cumulative = get_stargazers_time_series(repository)
+                stargazers, stargazers_cumulative = get_stargazers_time_series(
+                    repository
+                )
             else:
                 stargazers, stargazers_cumulative = build_time_series(
                     repository, "stargazers_count"
@@ -60,93 +69,155 @@ if __name__ == "__main__":
                     _,
                 ) = get_additions_deletions_time_series(repository)
             else:
-                commits_dates, commits_cumulative = build_time_series(repository, "commits")
+                commits_dates, commits_cumulative = build_time_series(
+                    repository, "commits"
+                )
 
             commits_time_series = list(zip(commits_dates, commits_cumulative))
 
             # Combine the time series
-            stargazers_time_series, issues_time_series = merge_time_series(stargazers_time_series, issues_time_series)
-            stargazers_time_series, commits_time_series = merge_time_series(stargazers_time_series, commits_time_series)
-            issues_time_series, commits_time_series = merge_time_series(issues_time_series, commits_time_series)
+            stargazers_time_series, issues_time_series = merge_time_series(
+                stargazers_time_series, issues_time_series
+            )
+            stargazers_time_series, commits_time_series = merge_time_series(
+                stargazers_time_series, commits_time_series
+            )
+            issues_time_series, commits_time_series = merge_time_series(
+                issues_time_series, commits_time_series
+            )
 
-            for time_series_idx in range(0, len(stargazers_time_series)):
+            # Sample by month
+            repository_age_months = ceil(repository["age"] / 2629746)
+            repository_age_start = stargazers_time_series[0][0].replace(
+                day=1, hour=0, second=0, microsecond=0
+            )
+            time_series_idx_increment = max(
+                1, int(len(stargazers_time_series) / repository_age_months)
+            )
+            time_series_idx = 0
+
+            for idx_month in range(0, repository_age_months):
+                repository_age_start += timedelta(days=31)
+                repository_age_start = repository_age_start.replace(
+                    day=1, hour=0, second=0, microsecond=0
+                )
+
                 df_time_series_rows.append(
                     {
-                        "ds": stargazers_time_series[time_series_idx][0].replace(microsecond=0),
-                        "unique_id": idx,
-                        "repository": repository["full_name"],
+                        "ds": repository_age_start,
+                        "unique_id": repository["full_name"],
+                        "repository": idx,
                         "stargazers": stargazers_time_series[time_series_idx][1],
                         "issues": issues_time_series[time_series_idx][1],
                         "commits": commits_time_series[time_series_idx][1],
                     }
                 )
 
+                if time_series_idx < len(stargazers_time_series):
+                    time_series_idx += time_series_idx_increment
+                else:
+                    time_series_idx = -1
+
         # Build data frame
-        df_time_series = pd.DataFrame(df_time_series_rows, columns=["ds", "unique_id", "repository", "stargazers", "issues", "commits"])
-        df_time_series.to_csv("../data/time_series_data.csv", index=False)
+        df_multi_time_series = pd.DataFrame(
+            df_time_series_rows,
+            columns=[
+                "ds",
+                "unique_id",
+                "repository",
+                "stargazers",
+                "issues",
+                "commits",
+            ],
+        )
+        df_multi_time_series.to_csv("../data/time_series_data.csv", index=False)
     else:
         # Load data frame
-        df_time_series = pd.read_csv("../data/time_series_data.csv", parse_dates=["ds"])
+        df_multi_time_series = pd.read_csv(
+            "../data/time_series_data.csv", parse_dates=["ds"]
+        )
 
     log.info("Dataset loaded, prepare for model training")
-    # Train for specific metric forecast
-    df_time_series = df_time_series.rename(columns={"stargazers": "y"})
-    df_time_series = df_time_series.drop(columns=["repository"])
 
-    # Align dates and aggregate duplicate dates
-    df_time_series["ds"] = df_time_series["ds"].dt.to_period("W-SAT").dt.start_time
+    # Initialize settings
+    h = FORECAST_HORIZON_MONTHS
+    training_settings = {
+        "stargazers": ["issues", "commits"],
+        "issues": ["stargazers", "commits"],
+        "commits": ["stargazers", "issues"],
+    }
 
-    last_date_by_repository = df_time_series.groupby("repository")["ds"].last()
-    repository_with_full_data = last_date_by_repository[last_date_by_repository == df_time_series["ds"].max()].index
-    df_time_series = df_time_series.loc[df_time_series["repository"].isin(repository_with_full_data)]
+    for feature_target, dynamic_features in training_settings.items():
+        log.info(f"Train model for {feature_target} forecasting")
+        # Train for specific metric forecast
+        df_time_series = df_multi_time_series.rename(columns={feature_target: "y"})
 
-    dynamic_features = ["issues", "commits"]
-    static_features = []
+        # Split dataset
+        idx_split = int(df_time_series["repository"].nunique() * 0.8)
+        df_training = (
+            df_time_series.loc[df_time_series["repository"] < idx_split]
+            .drop(columns=["repository"])
+            .reset_index(drop=True)
+            .set_index(dynamic_features, append=True)
+        )
+        df_test = (
+            df_time_series.loc[df_time_series["repository"] >= idx_split]
+            .groupby("repository")
+            .head(-FORECAST_HORIZON_MONTHS)
+            .drop(columns=["repository"])
+            .reset_index(drop=True)
+            .set_index(dynamic_features, append=True)
+        )
+        df_validation = (
+            df_time_series.loc[df_time_series["repository"] >= idx_split]
+            .groupby("repository")
+            .tail(FORECAST_HORIZON_MONTHS)
+            .drop(columns=["repository"])
+            .reset_index(drop=True)
+            .set_index(dynamic_features, append=True)
+        )
 
-    # Split dataset
-    df_training = df_time_series.loc[df_time_series["ds"] < DATE_SPLIT]
-    df_validation = df_time_series.loc[df_time_series["ds"] >= DATE_SPLIT]
+        # Setup the forecasting model
+        log.info("Setup model")
+        models = [
+            # make_pipeline(
+            #     SimpleImputer(),
+            #     RandomForestRegressor(random_state=0, n_estimators=100)
+            # ),
+            XGBRegressor(random_state=0, n_estimators=100, device="cuda"),
+        ]
 
-    # Set forecast horizon, in weeks
-    h = FORECAST_HORIZON_WEEKS
+        model = MLForecast(
+            models=models,
+            freq="MS",
+            lags=range(1, 13),
+            target_transforms=[Differences([1, 12])],
+        )
 
-    # Setup the forecasting model
-    log.info("Setup model")
-    # models = [
-    #     make_pipeline(
-    #         SimpleImputer(),
-    #         RandomForestRegressor(random_state=0, n_estimators=100)
-    #     ),
-    #     XGBRegressor(random_state=0, n_estimators=100, device="cuda"),
-    # ]
+        # Fit training data to the model
+        log.info("Train model on training set")
+        model.fit(
+            df_training,
+            id_col="unique_id",
+            time_col="ds",
+            target_col="y",
+            static_features=[],
+        )
 
-    model = MLForecast(
-        models=XGBRegressor(random_state=0, n_estimators=100, device="cuda"),
-        freq="W",
-        lags=[1, 2, 4],
-        lag_transforms={
-            1: [(rolling_mean, 4), (rolling_min, 4), (rolling_max, 4)],
-        },
-        date_features=["week", "month"],
-        num_threads=6,
-    )
+        # Predict data
+        log.info("Make predictions on validation set")
+        predictions = model.predict(
+            h=h,
+            new_df=df_test,
+        )
+        predictions = predictions.merge(
+            df_validation[["unique_id", "ds", "y"]], on=["unique_id", "ds"], how="left"
+        )
 
-    # Fit training data to the model
-    log.info("Train model on training set")
-    model.fit(
-        df_training,
-        id_col="unique_id",
-        time_col="ds",
-        target_col="y",
-        static_features=static_features,
-        max_horizon=h
-    )
+        # Plot time frames
+        fig = plot_series(df_test, predictions)
+        fig.show()
 
-    # Predict data
-    log.info("Make predictions on validation set")
-    predictions = model.predict(
-        h=h,
-        new_df=df_validation,
-    )
-    predictions = predictions.merge(df_validation[["unique_id", "ds", "y"]], on=["unique_id", "ds"], how="left")
-    log.info(predictions.head())
+        log.info("--------------")
+
+    log.info("Multivariate time series forecasting completed!")
