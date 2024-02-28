@@ -17,35 +17,12 @@ if __name__ == "__main__":
     github_api_client = GitHubAPI()
 
     # Get the repositories in the database
-    repositories = mo.db["repositories_data"].find()
+    repositories = mo.db["repositories_data"].find({"statistics": {"$exists": True}})
 
     for repository in repositories:
         update_flag = False
 
-        # The api does not process repos with more than 10000 commits, so those are skipped
-        if repository["commits"] <= 10000:
-            repository_statistics = github_api_client.get_weekly_commits_statistics(
-                repository["owner"], repository["name"]
-            )
-
-            # If new statistics are available, update the object
-            if repository_statistics:
-                mo.db["repositories_data"].update_one(
-                    {"full_name": repository["full_name"]},
-                    {
-                        "$set": {
-                            "statistics.commits_weekly": repository_statistics,
-                        }
-                    },
-                )
-                log.info(
-                    "Successfully updated commits data for {}".format(
-                        repository["full_name"]
-                    )
-                )
-                update_flag = True
-
-        # Gather time series about stargazers and issues
+        # Gather time series about commits, stargazers and issues
         # The operations are executed if the db entry has been updated more than 1 day ago
         if (datetime.now(tz=utc) - repository["metadata"]["modified"]).days < 1:
             log.info(
@@ -54,6 +31,31 @@ if __name__ == "__main__":
                 )
             )
             continue
+
+        (
+            repository_commits_count,
+            repository_commits_dates,
+            repository_contributors,
+        ) = github_api_client.get_repository_commits(
+            repository["owner"], repository["name"]
+        )
+        if repository_commits_count:
+            mo.db["repositories_data"].update_one(
+                {"full_name": repository["full_name"]},
+                {
+                    "$set": {
+                        "commits": repository_commits_count,
+                        "statistics.commits": repository_commits_dates,
+                        "statistics.contributors": repository_contributors,
+                    }
+                },
+            )
+            log.info(
+                "Successfully updated commits data for {}".format(
+                    repository["full_name"]
+                )
+            )
+            update_flag = True
 
         repository_stargazers = github_api_client.get_repository_stargazers_time(
             repository["owner"], repository["name"]

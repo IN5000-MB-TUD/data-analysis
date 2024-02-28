@@ -157,20 +157,20 @@ class GitHubAPI:
             for branch in github_api_response.json()
         }
 
-    def get_repository_commits_count(self, repository_owner, repository_name):
+    def get_repository_commits(self, repository_owner, repository_name):
         """
-        Get commits count from GitHub.
+        Get commits from GitHub.
         The commits are taken from the main branch.
 
         :param repository_owner: The owner of the repository.
         :param repository_name: The name of the repository.
-        :return: The commits count from the GitHubAPI. None if an error occurs.
+        :return: The commits from the GitHubAPI. None if an error occurs.
         """
         if not self.github_auth_token:
             log.warning(
                 "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
             )
-            return None
+            return None, None, None
 
         headers = {
             "Authorization": "Bearer " + self.github_auth_token,
@@ -179,6 +179,8 @@ class GitHubAPI:
         response_page = 1
         commits_count = 0
         commits_to_add = 100
+        commits_dates = {}
+        commits_contributors = {}
         request_url = (
             self.github_api_url
             + f"{repository_owner}/{repository_name}/commits?per_page=100"
@@ -192,13 +194,41 @@ class GitHubAPI:
                 log.error(
                     f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
                 )
-                return None
+                return None, None, None
             else:
                 commits_to_add = len(github_api_response.json())
-                commits_count += commits_to_add
+
+                # Retrieve data
+                for commit in github_api_response.json():
+                    if (
+                        commit.get("author")
+                        and commit.get("commit", {}).get("author", {}).get("date", None)
+                        and commit.get("author", {}).get("login", None)
+                    ):
+                        commit_date = datetime.strptime(
+                            commit["commit"]["author"]["date"], DATE_FORMAT
+                        ).replace(tzinfo=utc)
+                        commit_author = commit["author"]["login"]
+
+                        commits_dates[commit["sha"]] = {
+                            "author": commit_author,
+                            "date": commit_date,
+                        }
+
+                        if commit_author not in commits_contributors:
+                            commits_contributors[commit_author] = {
+                                "first_commit": commit_date,
+                                "commits": 1,
+                            }
+                        else:
+                            commits_contributors[commit_author]["commits"] += 1
+
+                        # Increase counter
+                        commits_count += 1
+
             response_page += 1
 
-        return commits_count
+        return commits_count, commits_dates, commits_contributors
 
     def get_repository_releases(self, repository_owner, repository_name):
         """
