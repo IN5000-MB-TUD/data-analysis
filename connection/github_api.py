@@ -19,6 +19,48 @@ class GitHubAPI:
         self.github_api_url = "https://api.github.com/repos/"
         self.github_auth_token = os.getenv("GITHUB_AUTH_TOKEN")
         self.github_api_version = "2022-11-28"
+        self.headers = {
+            "Authorization": "Bearer " + self.github_auth_token,
+            "X-GitHub-Api-Version": self.github_api_version,
+            "Accept": "application/vnd.github+json",
+        }
+
+    def _is_authenticated(self):
+        """
+        Check the GitHub API authentication.
+
+        :return: True if the token exists. False otherwise.
+        """
+        if not self.github_auth_token:
+            log.warning(
+                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
+            )
+            return False
+
+        return True
+
+    def _make_request(self, request_url, headers, repository_owner, repository_name):
+        """
+        Make request to the GitHub API.
+
+        :param request_url: Request URL.
+        :param headers: The request headers.
+        :param repository_owner: The repository owner.
+        :param repository_name: The repository name.
+        :return: The response body. None if an error occurs.
+        """
+        if not self._is_authenticated():
+            return None
+
+        github_api_response = requests.get(request_url, headers=headers)
+        if github_api_response.status_code != 200:
+            log.error(
+                f"The request for repository {repository_owner}/{repository_name} returned a status code "
+                f"{github_api_response.status_code}: {github_api_response.reason}"
+            )
+            return None
+
+        return github_api_response.json()
 
     def get_repository_data(self, repository_owner, repository_name):
         """
@@ -28,26 +70,11 @@ class GitHubAPI:
         :param repository_name: The name of the repository.
         :return: The data from the GitHubAPI as a dictionary. None if an error occurs.
         """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
         request_url = self.github_api_url + f"{repository_owner}/{repository_name}"
 
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-            )
-            return None
-
-        return github_api_response.json()
+        return self._make_request(
+            request_url, self.headers, repository_owner, repository_name
+        )
 
     def get_repository_contributors(self, repository_owner, repository_name):
         """
@@ -57,28 +84,13 @@ class GitHubAPI:
         :param repository_name: The name of the repository.
         :return: The contributors data from the GitHubAPI as a dictionary. None if an error occurs.
         """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
         request_url = (
             self.github_api_url + f"{repository_owner}/{repository_name}/contributors"
         )
 
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-            )
-            return None
-
-        github_repository_contributors = github_api_response.json()
+        github_repository_contributors = self._make_request(
+            request_url, self.headers, repository_owner, repository_name
+        )
         repository_contributors = {}
 
         for contributor in github_repository_contributors:
@@ -100,28 +112,13 @@ class GitHubAPI:
         :param repository_name: The name of the repository.
         :return: The programming languages data from the GitHubAPI as a dictionary. None if an error occurs.
         """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
         request_url = (
             self.github_api_url + f"{repository_owner}/{repository_name}/languages"
         )
 
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-            )
-            return None
-
-        return github_api_response.json()
+        return self._make_request(
+            request_url, self.headers, repository_owner, repository_name
+        )
 
     def get_repository_branches(self, repository_owner, repository_name):
         """
@@ -131,30 +128,20 @@ class GitHubAPI:
         :param repository_name: The name of the repository.
         :return: The active branches data from the GitHubAPI as a list. None if an error occurs.
         """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
         request_url = (
             self.github_api_url + f"{repository_owner}/{repository_name}/branches"
         )
 
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-            )
+        github_api_response = self._make_request(
+            request_url, self.headers, repository_owner, repository_name
+        )
+
+        if not github_api_response:
             return None
 
         return {
             branch["name"]: {"protected": branch["protected"]}
-            for branch in github_api_response.json()
+            for branch in github_api_response
         }
 
     def get_repository_commits(self, repository_owner, repository_name):
@@ -166,16 +153,6 @@ class GitHubAPI:
         :param repository_name: The name of the repository.
         :return: The commits from the GitHubAPI. None if an error occurs.
         """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None, None, None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
         response_page = 1
         commits_count = 0
         commits_to_add = 100
@@ -187,19 +164,19 @@ class GitHubAPI:
         )
 
         while commits_to_add > 0:
-            github_api_response = requests.get(
-                request_url + f"&page={response_page}", headers=headers
+            github_api_response = self._make_request(
+                request_url + f"&page={response_page}",
+                self.headers,
+                repository_owner,
+                repository_name,
             )
-            if github_api_response.status_code != 200:
-                log.error(
-                    f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-                )
+            if not github_api_response:
                 return None, None, None
             else:
-                commits_to_add = len(github_api_response.json())
+                commits_to_add = len(github_api_response)
 
                 # Retrieve data
-                for commit in github_api_response.json():
+                for commit in github_api_response:
                     if (
                         commit.get("author")
                         and commit.get("commit", {}).get("author", {}).get("date", None)
@@ -238,16 +215,6 @@ class GitHubAPI:
         :param repository_name: The name of the repository.
         :return: The releases data from the GitHubAPI as a dictionary. None if an error occurs.
         """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
         response_page = 1
         releases_to_add = 100
         repository_releases = {}
@@ -257,17 +224,17 @@ class GitHubAPI:
         )
 
         while releases_to_add > 0:
-            github_api_response = requests.get(
-                request_url + f"&page={response_page}", headers=headers
+            github_api_response = self._make_request(
+                request_url + f"&page={response_page}",
+                self.headers,
+                repository_owner,
+                repository_name,
             )
-            if github_api_response.status_code != 200:
-                log.error(
-                    f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-                )
+            if not github_api_response:
                 return None
             else:
-                releases_to_add = len(github_api_response.json())
-                for release in github_api_response.json():
+                releases_to_add = len(github_api_response)
+                for release in github_api_response:
                     release_name = (
                         release["name"] if release["name"] else release["tag_name"]
                     )
@@ -300,29 +267,18 @@ class GitHubAPI:
         :param repository_name: The name of the repository.
         :return: The repository dependencies count from the GitHubAPI. None if an error occurs.
         """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
         request_url = (
             self.github_api_url
             + f"{repository_owner}/{repository_name}/dependency-graph/sbom"
         )
 
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-            )
+        github_api_response = self._make_request(
+            request_url, self.headers, repository_owner, repository_name
+        )
+        if not github_api_response:
             return None
 
-        return len(github_api_response.json().get("sbom", {}).get("packages", []))
+        return len(github_api_response.get("sbom", {}).get("packages", []))
 
     def get_repository_stargazers_time(self, repository_owner, repository_name):
         """
@@ -332,17 +288,8 @@ class GitHubAPI:
         :param repository_name: The name of the repository.
         :return: The stargazers time data from the GitHubAPI as a list. None if an error occurs.
         """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-            "Accept": "application/vnd.github.v3.star+json",
-        }
+        headers = self.headers
+        headers["Accept"] = "application/vnd.github.v3.star+json"
         response_page = 1
         stargazers_to_add = 100
         repository_stargazers = []
@@ -352,17 +299,17 @@ class GitHubAPI:
         )
 
         while stargazers_to_add > 0:
-            github_api_response = requests.get(
-                request_url + f"&page={response_page}", headers=headers
+            github_api_response = self._make_request(
+                request_url + f"&page={response_page}",
+                headers,
+                repository_owner,
+                repository_name,
             )
-            if github_api_response.status_code != 200:
-                log.error(
-                    f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-                )
+            if not github_api_response:
                 return None
             else:
-                stargazers_to_add = len(github_api_response.json())
-                for stargaze in github_api_response.json():
+                stargazers_to_add = len(github_api_response)
+                for stargaze in github_api_response:
                     if stargaze.get("starred_at"):
                         repository_stargazers.append(
                             datetime.strptime(
@@ -381,16 +328,6 @@ class GitHubAPI:
         :param repository_name: The name of the repository.
         :return: The issues time data from the GitHubAPI as a dictionary. None if an error occurs.
         """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
         response_page = 1
         issues_to_add = 100
         repository_issues = {}
@@ -400,17 +337,17 @@ class GitHubAPI:
         )
 
         while issues_to_add > 0:
-            github_api_response = requests.get(
-                request_url + f"&page={response_page}", headers=headers
+            github_api_response = self._make_request(
+                request_url + f"&page={response_page}",
+                self.headers,
+                repository_owner,
+                repository_name,
             )
-            if github_api_response.status_code != 200:
-                log.error(
-                    f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-                )
+            if not github_api_response:
                 return None
             else:
-                issues_to_add = len(github_api_response.json())
-                for issue in github_api_response.json():
+                issues_to_add = len(github_api_response)
+                for issue in github_api_response:
                     repository_issues.update(
                         {
                             "issue_{}".format(issue["number"]): {
