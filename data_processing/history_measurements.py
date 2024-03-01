@@ -43,7 +43,7 @@ if __name__ == "__main__":
             # Compute historical measurements
             releases_history_metrics = compute_releases_history_metrics(
                 releases_statistics,
-                ["stargazers", "issues", "total_changes", "additions", "deletions"],
+                ["stargazers", "issues"],
             )
 
             log.info(releases_history_metrics)

@@ -6,7 +6,6 @@ from connection import mo
 from data_processing.utils import (
     get_stargazers_time_series,
     get_issues_time_series,
-    get_additions_deletions_time_series,
     compute_time_series_segments_trends,
     compute_pattern_distance,
 )
@@ -77,47 +76,6 @@ if __name__ == "__main__":
                 "issues_trends"
             ] = issues_trends
 
-        # Process Weekly Commits Stats
-        if repository.get("statistics", {}).get("commits_weekly"):
-            (
-                commits_dates,
-                commits_cumulative,
-                additions_cumulative,
-                deletions_cumulative,
-            ) = get_additions_deletions_time_series(repository)
-
-            # Create list of points (x, y) => (time_ms, changes_count)
-            changes_time_series = [
-                (int(commits_dates[i].timestamp()), commits_cumulative[i])
-                for i in range(len(commits_dates))
-            ]
-            additions_time_series = [
-                (int(commits_dates[i].timestamp()), additions_cumulative[i])
-                for i in range(len(commits_dates))
-            ]
-            deletions_time_series = [
-                (int(commits_dates[i].timestamp()), deletions_cumulative[i])
-                for i in range(len(commits_dates))
-            ]
-
-            changes_pip = pip(changes_time_series, k)
-            additions_pip = pip(additions_time_series, k)
-            deletions_pip = pip(deletions_time_series, k)
-
-            changes_trends = compute_time_series_segments_trends(changes_pip)
-            additions_trends = compute_time_series_segments_trends(additions_pip)
-            deletions_trends = compute_time_series_segments_trends(deletions_pip)
-
-            repository_sequences[repository["full_name"]][
-                "changes_trends"
-            ] = changes_trends
-            repository_sequences[repository["full_name"]][
-                "additions_trends"
-            ] = additions_trends
-            repository_sequences[repository["full_name"]][
-                "deletions_trends"
-            ] = deletions_trends
-
         log.info("------------------------")
 
     log.info("Start computation of pattern distances")
@@ -131,9 +89,6 @@ if __name__ == "__main__":
                 pattern_distance_matrix[repo_1_key][repo_2_key] = {
                     "stargazers": 0,
                     "issues": 0,
-                    "changes": 0,
-                    "additions": 0,
-                    "deletions": 0,
                 }
                 continue
 
