@@ -381,3 +381,278 @@ class GitHubAPI:
             response_page += 1
 
         return repository_issues
+
+    def get_repository_workflows(self, repository_owner, repository_name):
+        """
+        Get workflows data from GitHub.
+
+        :param repository_owner: The owner of the repository.
+        :param repository_name: The name of the repository.
+        :return: The repository workflow data. None if an error occurs.
+        """
+        response_page = 1
+        workflows_to_add = 100
+        repository_workflows = {}
+        request_url = (
+            self.github_api_url
+            + f"{repository_owner}/{repository_name}/actions/workflows?per_page=100"
+        )
+
+        while workflows_to_add > 0:
+            github_api_response = self._make_request(
+                request_url + f"&page={response_page}",
+                self.headers,
+                repository_owner,
+                repository_name,
+            )
+            if not github_api_response:
+                return None
+            else:
+                workflows_to_add = len(github_api_response.get("workflows", []))
+                for workflow in github_api_response.get("workflows", []):
+                    repository_workflows.update(
+                        {
+                            f"workflow_{workflow['id']}": {
+                                "id": workflow["id"],
+                                "name": workflow["name"],
+                                "created_at": datetime.strptime(
+                                    workflow["created_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc),
+                            }
+                        }
+                    )
+            response_page += 1
+
+        return repository_workflows
+
+    def get_repository_workflows_time(self, repository_owner, repository_name):
+        """
+        Get workflows time series data from GitHub.
+
+        :param repository_owner: The owner of the repository.
+        :param repository_name: The name of the repository.
+        :return: The repository workflow time series data. None if an error occurs.
+        """
+        response_page = 1
+        workflow_runs_to_add = 100
+        repository_workflow_runs = {}
+        request_url = (
+            self.github_api_url
+            + f"{repository_owner}/{repository_name}/actions/runs?per_page=100"
+        )
+
+        while workflow_runs_to_add > 0:
+            github_api_response = self._make_request(
+                request_url + f"&page={response_page}",
+                self.headers,
+                repository_owner,
+                repository_name,
+            )
+            if not github_api_response:
+                return None
+            else:
+                workflow_runs_to_add = len(github_api_response.get("workflow_runs", []))
+                for workflow_run in github_api_response.get("workflow_runs", []):
+                    repository_workflow_runs.update(
+                        {
+                            f"run_{workflow_run['id']}": {
+                                "id": workflow_run["id"],
+                                "workflow_id": workflow_run["workflow_id"],
+                                "created_at": datetime.strptime(
+                                    workflow_run["created_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc),
+                            }
+                        }
+                    )
+            response_page += 1
+
+        return repository_workflow_runs
+
+    def get_repository_environments(self, repository_owner, repository_name):
+        """
+        Get environments data from GitHub.
+
+        :param repository_owner: The owner of the repository.
+        :param repository_name: The name of the repository.
+        :return: The repository environments data. None if an error occurs.
+        """
+        response_page = 1
+        environments_to_add = 100
+        repository_environments = {}
+        request_url = (
+            self.github_api_url
+            + f"{repository_owner}/{repository_name}/environments?per_page=100"
+        )
+
+        while environments_to_add > 0:
+            github_api_response = self._make_request(
+                request_url + f"&page={response_page}",
+                self.headers,
+                repository_owner,
+                repository_name,
+            )
+            if not github_api_response:
+                return None
+            else:
+                environments_to_add = len(github_api_response.get("environments", []))
+                for environment in github_api_response.get("environments", []):
+                    repository_environments.update(
+                        {
+                            f"env_{environment['id']}": {
+                                "id": environment["id"],
+                                "name": environment["name"],
+                                "created_at": datetime.strptime(
+                                    environment["created_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc),
+                            }
+                        }
+                    )
+            response_page += 1
+
+        return repository_environments
+
+    def get_repository_deployments(self, repository_owner, repository_name):
+        """
+        Get deployments time series data from GitHub.
+
+        :param repository_owner: The owner of the repository.
+        :param repository_name: The name of the repository.
+        :return: The repository deployments time series data. None if an error occurs.
+        """
+        response_page = 1
+        deployments_to_add = 100
+        repository_deployments = {}
+        request_url = (
+            self.github_api_url
+            + f"{repository_owner}/{repository_name}/deployments?per_page=100"
+        )
+
+        while deployments_to_add > 0:
+            github_api_response = self._make_request(
+                request_url + f"&page={response_page}",
+                self.headers,
+                repository_owner,
+                repository_name,
+            )
+            if not github_api_response:
+                return None
+            else:
+                deployments_to_add = len(github_api_response)
+                for deployment in github_api_response:
+                    repository_deployments.update(
+                        {
+                            f"deployment_{deployment['id']}": {
+                                "id": deployment["id"],
+                                "environment": deployment["environment"],
+                                "transient_environment": deployment[
+                                    "transient_environment"
+                                ],
+                                "production_environment": deployment[
+                                    "production_environment"
+                                ],
+                                "created_at": datetime.strptime(
+                                    deployment["created_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc),
+                            }
+                        }
+                    )
+            response_page += 1
+
+        return repository_deployments
+
+    def get_repository_pull_requests_time(self, repository_owner, repository_name):
+        """
+        Get pull request time series data from GitHub.
+
+        :param repository_owner: The owner of the repository.
+        :param repository_name: The name of the repository.
+        :return: The repository pull request time series data. None if an error occurs.
+        """
+        response_page = 1
+        pull_request_to_add = 100
+        repository_pull_request = {}
+        request_url = (
+            self.github_api_url
+            + f"{repository_owner}/{repository_name}/pulls?per_page=100"
+        )
+
+        while pull_request_to_add > 0:
+            github_api_response = self._make_request(
+                request_url + f"&page={response_page}",
+                self.headers,
+                repository_owner,
+                repository_name,
+            )
+            if not github_api_response:
+                return None
+            else:
+                pull_request_to_add = len(github_api_response)
+                for pull_request in github_api_response:
+                    repository_pull_request.update(
+                        {
+                            f"pull_{pull_request['number']}": {
+                                "id": pull_request["id"],
+                                "number": pull_request["number"],
+                                "state": pull_request["state"],
+                                "created_at": datetime.strptime(
+                                    pull_request["created_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc),
+                                "closed_at": datetime.strptime(
+                                    pull_request["closed_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc)
+                                if pull_request["closed_at"]
+                                else None,
+                                "merged_at": datetime.strptime(
+                                    pull_request["merged_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc)
+                                if pull_request["merged_at"]
+                                else None,
+                            }
+                        }
+                    )
+            response_page += 1
+
+        return repository_pull_request
+
+    def get_repository_forks(self, repository_owner, repository_name):
+        """
+        Get forks time series data from GitHub.
+
+        :param repository_owner: The owner of the repository.
+        :param repository_name: The name of the repository.
+        :return: The repository forks time series data. None if an error occurs.
+        """
+        response_page = 1
+        forks_to_add = 100
+        repository_forks = {}
+        request_url = (
+            self.github_api_url
+            + f"{repository_owner}/{repository_name}/forks?per_page=100"
+        )
+
+        while forks_to_add > 0:
+            github_api_response = self._make_request(
+                request_url + f"&page={response_page}",
+                self.headers,
+                repository_owner,
+                repository_name,
+            )
+            if not github_api_response:
+                return None
+            else:
+                forks_to_add = len(github_api_response)
+                for fork in github_api_response:
+                    repository_forks.update(
+                        {
+                            f"fork_{fork['id']}": {
+                                "id": fork["id"],
+                                "full_name": fork["full_name"],
+                                "created_at": datetime.strptime(
+                                    fork["created_at"], DATE_FORMAT
+                                ).replace(tzinfo=utc),
+                            }
+                        }
+                    )
+            response_page += 1
+
+        return repository_forks
