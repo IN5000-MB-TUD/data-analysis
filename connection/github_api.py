@@ -9,6 +9,7 @@ from pytz import utc
 log = logging.getLogger(__name__)
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+DATE_FORMAT_MS = "%Y-%m-%dT%H:%M:%S.000%z"
 
 
 class GitHubAPI:
@@ -136,7 +137,7 @@ class GitHubAPI:
             request_url, self.headers, repository_owner, repository_name
         )
 
-        if not github_api_response:
+        if github_api_response is None:
             return None
 
         return {
@@ -170,7 +171,7 @@ class GitHubAPI:
                 repository_owner,
                 repository_name,
             )
-            if not github_api_response:
+            if github_api_response is None:
                 return None, None, None
             else:
                 commits_to_add = len(github_api_response)
@@ -230,7 +231,7 @@ class GitHubAPI:
                 repository_owner,
                 repository_name,
             )
-            if not github_api_response:
+            if github_api_response is None:
                 return None
             else:
                 releases_to_add = len(github_api_response)
@@ -275,7 +276,7 @@ class GitHubAPI:
         github_api_response = self._make_request(
             request_url, self.headers, repository_owner, repository_name
         )
-        if not github_api_response:
+        if github_api_response is None:
             return None
 
         return len(github_api_response.get("sbom", {}).get("packages", []))
@@ -305,7 +306,7 @@ class GitHubAPI:
                 repository_owner,
                 repository_name,
             )
-            if not github_api_response:
+            if github_api_response is None:
                 return None
             else:
                 stargazers_to_add = len(github_api_response)
@@ -343,7 +344,7 @@ class GitHubAPI:
                 repository_owner,
                 repository_name,
             )
-            if not github_api_response:
+            if github_api_response is None:
                 return None
             else:
                 issues_to_add = len(github_api_response)
@@ -405,7 +406,7 @@ class GitHubAPI:
                 repository_owner,
                 repository_name,
             )
-            if not github_api_response:
+            if github_api_response is None:
                 return None
             else:
                 workflows_to_add = len(github_api_response.get("workflows", []))
@@ -416,7 +417,7 @@ class GitHubAPI:
                                 "id": workflow["id"],
                                 "name": workflow["name"],
                                 "created_at": datetime.strptime(
-                                    workflow["created_at"], DATE_FORMAT
+                                    workflow["created_at"], DATE_FORMAT_MS
                                 ).replace(tzinfo=utc),
                             }
                         }
@@ -438,7 +439,7 @@ class GitHubAPI:
         repository_workflow_runs = {}
         request_url = (
             self.github_api_url
-            + f"{repository_owner}/{repository_name}/actions/runs?per_page=100"
+            + f"{repository_owner}/{repository_name}/actions/runs?status=success&per_page=100"
         )
 
         while workflow_runs_to_add > 0:
@@ -448,7 +449,7 @@ class GitHubAPI:
                 repository_owner,
                 repository_name,
             )
-            if not github_api_response:
+            if github_api_response is None:
                 return None
             else:
                 workflow_runs_to_add = len(github_api_response.get("workflow_runs", []))
@@ -491,7 +492,7 @@ class GitHubAPI:
                 repository_owner,
                 repository_name,
             )
-            if not github_api_response:
+            if github_api_response is None:
                 return None
             else:
                 environments_to_add = len(github_api_response.get("environments", []))
@@ -534,7 +535,7 @@ class GitHubAPI:
                 repository_owner,
                 repository_name,
             )
-            if not github_api_response:
+            if github_api_response is None:
                 return None
             else:
                 deployments_to_add = len(github_api_response)
@@ -583,7 +584,7 @@ class GitHubAPI:
                 repository_owner,
                 repository_name,
             )
-            if not github_api_response:
+            if github_api_response is None:
                 return None
             else:
                 pull_request_to_add = len(github_api_response)
@@ -637,7 +638,7 @@ class GitHubAPI:
                 repository_owner,
                 repository_name,
             )
-            if not github_api_response:
+            if github_api_response is None:
                 return None
             else:
                 forks_to_add = len(github_api_response)
