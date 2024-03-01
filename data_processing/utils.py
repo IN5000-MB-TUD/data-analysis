@@ -86,32 +86,6 @@ def get_issues_time_series(repository):
     return issues_dates, issues_cumulative
 
 
-def get_additions_deletions_time_series(repository):
-    """Get repository additions and deletions time series"""
-    commits_dates = [
-        commit["timestamp"]
-        for commit in repository["statistics"]["commits_weekly"].values()
-    ]
-
-    commits_cumulative = []
-    additions_cumulative = []
-    deletions_cumulative = []
-    commits_counter = 0
-    additions_counter = 0
-    deletions_counter = 0
-    for commit in repository["statistics"]["commits_weekly"].values():
-        commits_counter += commit["total"]
-        commits_cumulative.append(commits_counter)
-
-        additions_counter += commit["additions"]
-        additions_cumulative.append(additions_counter)
-
-        deletions_counter += commit["deletions"]
-        deletions_cumulative.append(deletions_counter)
-
-    return commits_dates, commits_cumulative, additions_cumulative, deletions_cumulative
-
-
 def build_time_series(repository, max_count_key):
     """Build time series based on repository age and variable max value"""
     if repository[max_count_key] == 0:
@@ -172,31 +146,6 @@ def create_releases_statistics_dictionary(releases, repository):
             release_statistics[release_key]["issues_timestamp"] = nearest_issue_date
             release_statistics[release_key]["issues"] = issues_cumulative[
                 nearest_issue_date_idx
-            ]
-
-        # Process Weekly Commits Stats
-        if repository.get("statistics", {}).get("commits_weekly"):
-            (
-                commits_dates,
-                commits_cumulative,
-                additions_cumulative,
-                deletions_cumulative,
-            ) = get_additions_deletions_time_series(repository)
-            # Find nearest date to weekly commit
-            nearest_commit_date_idx, nearest_commit_date = nearest(
-                commits_dates, release_values["created_at"]
-            )
-            release_statistics[release_key][
-                "commits_weekly_timestamp"
-            ] = nearest_commit_date
-            release_statistics[release_key]["total_changes"] = commits_cumulative[
-                nearest_commit_date_idx
-            ]
-            release_statistics[release_key]["additions"] = additions_cumulative[
-                nearest_commit_date_idx
-            ]
-            release_statistics[release_key]["deletions"] = deletions_cumulative[
-                nearest_commit_date_idx
             ]
 
     return release_statistics
@@ -310,53 +259,63 @@ def merge_segments_trends(trend_1, trend_2):
     return trends_1_adjusted, trends_2_adjusted
 
 
-def merge_time_series(trend_1, trend_2):
+def merge_time_series(time_series_1, time_series_2):
     """Merge two time series to align the time sequence"""
-    if not trend_1 and not trend_2:
+    if not time_series_1 and not time_series_2:
         current_time = datetime.now(tz=utc)
         return [(current_time, 0)], [(current_time, 0)]
 
-    trend_1_times = [t for (t, _) in trend_1]
-    trend_2_times = [t for (t, _) in trend_2]
+    time_series_1_times = [t for (t, _) in time_series_1]
+    time_series_2_times = [t for (t, _) in time_series_2]
 
-    trends_times = trend_1_times + list(set(trend_2_times) - set(trend_1_times))
-    trends_times.sort()
+    time_series_times = time_series_1_times + list(
+        set(time_series_2_times) - set(time_series_1_times)
+    )
+    time_series_times.sort()
 
-    trends_1_adjusted = []
-    trends_2_adjusted = []
+    time_series_1_adjusted = []
+    time_series_2_adjusted = []
 
-    trends_1_idx = 0
-    trends_2_idx = 0
+    time_series_1_idx = 0
+    time_series_2_idx = 0
 
     # Make sure that the lists are populated
-    if not trend_1:
-        trend_1 = [(trends_times[0], 0)]
+    if not time_series_1:
+        time_series_1 = [(time_series_times[0], 0)]
 
-    if not trend_2:
-        trend_2 = [(trends_times[0], 0)]
+    if not time_series_2:
+        time_series_2 = [(time_series_times[0], 0)]
 
-    for trend_timestamp in trends_times:
-        # Trends 1
-        if trends_1_idx < len(trend_1):
-            if trend_timestamp == trend_1[trends_1_idx][0]:
-                trends_1_adjusted.append((trend_timestamp, trend_1[trends_1_idx][1]))
-                trends_1_idx += 1
+    for time_series_timestamp in time_series_times:
+        # Time Series 1
+        if time_series_1_idx < len(time_series_1):
+            if time_series_timestamp == time_series_1[time_series_1_idx][0]:
+                time_series_1_adjusted.append(
+                    (time_series_timestamp, time_series_1[time_series_1_idx][1])
+                )
+                time_series_1_idx += 1
             else:
-                trends_1_adjusted.append((trend_timestamp, trend_1[trends_1_idx][1]))
+                time_series_1_adjusted.append(
+                    (time_series_timestamp, time_series_1[time_series_1_idx][1])
+                )
         else:
-            trends_1_adjusted.append((trend_timestamp, trend_1[-1][1]))
+            time_series_1_adjusted.append((time_series_timestamp, time_series_1[-1][1]))
 
-        # Trends 2
-        if trends_2_idx < len(trend_2):
-            if trend_timestamp == trend_2[trends_2_idx][0]:
-                trends_2_adjusted.append((trend_timestamp, trend_2[trends_2_idx][1]))
-                trends_2_idx += 1
+        # Time Series 2
+        if time_series_2_idx < len(time_series_2):
+            if time_series_timestamp == time_series_2[time_series_2_idx][0]:
+                time_series_2_adjusted.append(
+                    (time_series_timestamp, time_series_2[time_series_2_idx][1])
+                )
+                time_series_2_idx += 1
             else:
-                trends_2_adjusted.append((trend_timestamp, trend_2[trends_2_idx][1]))
+                time_series_2_adjusted.append(
+                    (time_series_timestamp, time_series_2[time_series_2_idx][1])
+                )
         else:
-            trends_2_adjusted.append((trend_timestamp, trend_2[-1][1]))
+            time_series_2_adjusted.append((time_series_timestamp, time_series_2[-1][1]))
 
-    return trends_1_adjusted, trends_2_adjusted
+    return time_series_1_adjusted, time_series_2_adjusted
 
 
 def compute_pattern_distance(trend_1, trend_2):

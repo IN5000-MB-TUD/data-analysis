@@ -324,51 +324,6 @@ class GitHubAPI:
 
         return len(github_api_response.json().get("sbom", {}).get("packages", []))
 
-    def get_weekly_commits_statistics(self, repository_owner, repository_name):
-        """
-        Get weekly commits activity data from GitHub.
-
-        :param repository_owner: The owner of the repository.
-        :param repository_name: The name of the repository.
-        :return: The repository weekly commits activity data from the GitHubAPI as a dictionary. None if an error occurs.
-        """
-        if not self.github_auth_token:
-            log.warning(
-                "Please provide a valid GITHUB_AUTH_TOKEN in your environment variables!"
-            )
-            return None
-
-        headers = {
-            "Authorization": "Bearer " + self.github_auth_token,
-            "X-GitHub-Api-Version": self.github_api_version,
-        }
-        request_url = (
-            self.github_api_url
-            + f"{repository_owner}/{repository_name}/stats/code_frequency"
-        )
-
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code {github_api_response.status_code}: {github_api_response.reason}"
-            )
-            return None
-
-        commits_stats = {}
-        for stats in github_api_response.json():
-            commits_week = datetime.fromtimestamp(stats[0]).replace(tzinfo=utc)
-            commits_additions = stats[1]
-            commits_deletions = abs(stats[2])
-
-            commits_stats[commits_week.strftime(DATE_FORMAT)] = {
-                "timestamp": commits_week,
-                "additions": commits_additions,
-                "deletions": commits_deletions,
-                "total": commits_additions + commits_deletions,
-            }
-
-        return commits_stats
-
     def get_repository_stargazers_time(self, repository_owner, repository_name):
         """
         Get stargazers time data from GitHub.

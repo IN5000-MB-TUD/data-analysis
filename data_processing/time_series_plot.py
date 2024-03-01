@@ -5,7 +5,6 @@ from data_processing.utils import (
     create_plot,
     get_stargazers_time_series,
     get_issues_time_series,
-    get_additions_deletions_time_series,
 )
 
 # Setup logging
@@ -60,28 +59,6 @@ if __name__ == "__main__":
                 "Count",
                 issues_dates,
                 [issues_cumulative],
-            )
-
-        # Process Weekly Commits Stats
-        if repository.get("statistics", {}).get("commits_weekly"):
-            (
-                commits_dates,
-                commits_cumulative,
-                additions_cumulative,
-                deletions_cumulative,
-            ) = get_additions_deletions_time_series(repository)
-
-            create_plot(
-                "../results/commits/{}_{}_{}.png".format(
-                    idx, repository["owner"], repository["name"]
-                ),
-                "Additions and Deletions {}".format(repository["full_name"]),
-                "Total Commits: {}".format(repository["commits"]),
-                "Date",
-                "Count",
-                commits_dates,
-                [commits_cumulative, additions_cumulative, deletions_cumulative],
-                ["Total", "Additions", "Deletions"],
             )
 
         log.info("------------------------")
