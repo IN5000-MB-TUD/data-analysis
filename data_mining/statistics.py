@@ -104,8 +104,8 @@ if __name__ == "__main__":
                 repository["_id"],
                 repository["full_name"],
                 {
-                    "statistics.commits": repository_commits_dates,
-                    "statistics.contributors": repository_contributors,
+                    "commits": repository_commits_dates,
+                    "contributors": repository_contributors,
                 },
                 "commits data",
             )
@@ -119,7 +119,7 @@ if __name__ == "__main__":
                 repository["_id"],
                 repository["full_name"],
                 {
-                    "statistics.stargazers": repository_stargazers,
+                    "stargazers": repository_stargazers,
                 },
                 "stargazers time series",
             )
@@ -133,7 +133,7 @@ if __name__ == "__main__":
                 repository["_id"],
                 repository["full_name"],
                 {
-                    "statistics.issues": repository_issues,
+                    "issues": repository_issues,
                 },
                 "issues time series",
             )
@@ -161,7 +161,7 @@ if __name__ == "__main__":
                 repository["_id"],
                 repository["full_name"],
                 {
-                    "statistics.workflows": repository_workflow_runs,
+                    "workflows": repository_workflow_runs,
                 },
                 "workflows time series",
             )
@@ -189,7 +189,7 @@ if __name__ == "__main__":
                 repository["_id"],
                 repository["full_name"],
                 {
-                    "statistics.deployments": repository_deployments,
+                    "deployments": repository_deployments,
                 },
                 "deployments time series",
             )
@@ -203,7 +203,7 @@ if __name__ == "__main__":
                 repository["_id"],
                 repository["full_name"],
                 {
-                    "statistics.pull_requests": repository_pull_requests,
+                    "pull_requests": repository_pull_requests,
                 },
                 "pull requests time series",
             )
@@ -217,7 +217,7 @@ if __name__ == "__main__":
                 repository["_id"],
                 repository["full_name"],
                 {
-                    "statistics.forks": repository_forks,
+                    "forks": repository_forks,
                 },
                 "forks time series",
             )
