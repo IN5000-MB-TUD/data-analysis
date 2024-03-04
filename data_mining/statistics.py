@@ -15,20 +15,30 @@ DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 STATISTICS_EXIST = True
 
 
-def _update_statistics(collection, repository_full_name, update_query, message):
+def _update_statistics(
+    collection, repository_id, repository_full_name, update_query, message
+):
     """
     Update statistics in the given collection.
 
     :param collection: The collection name.
+    :param repository_id: The repository unique id in the database.
     :param repository_full_name: The repository full name.
     :param update_query: The update query.
     :param message: The message to log.
     :return: True if the update was successful. False otherwise.
     """
+
+    # Setup query
+    search_query = {"full_name": repository_full_name}
+    if repository_id:
+        search_query["repository_id"] = repository_id
+
     try:
         mo.db[collection].update_one(
-            {"full_name": repository_full_name},
+            search_query,
             {"$set": update_query},
+            upsert=True,
         )
         log.info(
             "Successfully updated {} for {}".format(
@@ -65,7 +75,7 @@ if __name__ == "__main__":
         # The operations are executed if the db entry has been updated more than 1 day ago
         if (datetime.now(tz=utc) - repository["metadata"]["modified"]).days < 1:
             log.info(
-                "Skipping repository {} since it was updated less than 1 day ago.".format(
+                "Skipping repository {} since it was updated less than 1 day ago.\n".format(
                     repository["full_name"]
                 )
             )
@@ -79,11 +89,21 @@ if __name__ == "__main__":
             repository["owner"], repository["name"]
         )
         if repository_commits_count is not None:
-            update_flag = _update_statistics(
+            _update_statistics(
                 "repositories_data",
+                None,
                 repository["full_name"],
                 {
                     "commits": repository_commits_count,
+                },
+                "commits count",
+            )
+
+            update_flag = _update_statistics(
+                "statistics_commits",
+                repository["_id"],
+                repository["full_name"],
+                {
                     "statistics.commits": repository_commits_dates,
                     "statistics.contributors": repository_contributors,
                 },
@@ -95,7 +115,8 @@ if __name__ == "__main__":
         )
         if repository_stargazers is not None:
             update_flag = _update_statistics(
-                "repositories_data",
+                "statistics_stargazers",
+                repository["_id"],
                 repository["full_name"],
                 {
                     "statistics.stargazers": repository_stargazers,
@@ -108,7 +129,8 @@ if __name__ == "__main__":
         )
         if repository_issues is not None:
             update_flag = _update_statistics(
-                "repositories_data",
+                "statistics_issues",
+                repository["_id"],
                 repository["full_name"],
                 {
                     "statistics.issues": repository_issues,
@@ -122,6 +144,7 @@ if __name__ == "__main__":
         if repository_workflows is not None:
             update_flag = _update_statistics(
                 "repositories_data",
+                None,
                 repository["full_name"],
                 {
                     "workflows": repository_workflows,
@@ -134,7 +157,8 @@ if __name__ == "__main__":
         )
         if repository_workflow_runs is not None:
             update_flag = _update_statistics(
-                "repositories_data",
+                "statistics_workflow_runs",
+                repository["_id"],
                 repository["full_name"],
                 {
                     "statistics.workflows": repository_workflow_runs,
@@ -148,6 +172,7 @@ if __name__ == "__main__":
         if repository_environments is not None:
             update_flag = _update_statistics(
                 "repositories_data",
+                None,
                 repository["full_name"],
                 {
                     "environments": repository_environments,
@@ -160,7 +185,8 @@ if __name__ == "__main__":
         )
         if repository_deployments is not None:
             update_flag = _update_statistics(
-                "repositories_data",
+                "statistics_deployments",
+                repository["_id"],
                 repository["full_name"],
                 {
                     "statistics.deployments": repository_deployments,
@@ -173,7 +199,8 @@ if __name__ == "__main__":
         )
         if repository_pull_requests is not None:
             update_flag = _update_statistics(
-                "repositories_data",
+                "statistics_pull_requests",
+                repository["_id"],
                 repository["full_name"],
                 {
                     "statistics.pull_requests": repository_pull_requests,
@@ -186,7 +213,8 @@ if __name__ == "__main__":
         )
         if repository_forks is not None:
             update_flag = _update_statistics(
-                "repositories_data",
+                "statistics_forks",
+                repository["_id"],
                 repository["full_name"],
                 {
                     "statistics.forks": repository_forks,
@@ -198,8 +226,10 @@ if __name__ == "__main__":
         if update_flag:
             _update_statistics(
                 "repositories_data",
+                None,
                 repository["full_name"],
                 {
+                    "statistics": True,
                     "metadata.modified": datetime.now(tz=utc),
                 },
                 "statistics data",
