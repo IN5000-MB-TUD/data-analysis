@@ -588,7 +588,7 @@ class GitHubAPI:
         repository_deployments = {}
 
         production_environment = "production"
-        for environment in environments:
+        for environment in environments.values():
             if environment["name"].lower() in {"production", "release"}:
                 production_environment = environment["name"]
                 break
