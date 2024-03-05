@@ -55,6 +55,15 @@ def _update_statistics(
             )
         )
         return False
+    except pymongo.errors.DocumentTooLarge as err:
+        log.warning(
+            "DocumentTooLarge while updating {} for {}: {}. Needs down-sampling.".format(
+                message,
+                repository_full_name,
+                err,
+            )
+        )
+        return False
 
     return True
 
@@ -81,11 +90,7 @@ if __name__ == "__main__":
             )
             continue
 
-        (
-            repository_commits_count,
-            repository_commits_dates,
-            repository_contributors,
-        ) = github_api_client.get_repository_commits(
+        repository_commits_count = github_api_client.get_repository_commits_count(
             repository["owner"], repository["name"]
         )
         if repository_commits_count is not None:
@@ -98,7 +103,13 @@ if __name__ == "__main__":
                 },
                 "commits count",
             )
+            repository["commits"] = repository_commits_count
 
+        (
+            repository_commits_dates,
+            repository_contributors,
+        ) = github_api_client.get_repository_commits(repository)
+        if repository_commits_dates is not None:
             update_flag = _update_statistics(
                 "statistics_commits",
                 repository["_id"],
@@ -107,11 +118,11 @@ if __name__ == "__main__":
                     "commits": repository_commits_dates,
                     "contributors": repository_contributors,
                 },
-                "commits data",
+                "commits",
             )
 
         repository_stargazers = github_api_client.get_repository_stargazers_time(
-            repository["owner"], repository["name"]
+            repository
         )
         if repository_stargazers is not None:
             update_flag = _update_statistics(
@@ -121,12 +132,10 @@ if __name__ == "__main__":
                 {
                     "stargazers": repository_stargazers,
                 },
-                "stargazers time series",
+                "stargazers",
             )
 
-        repository_issues = github_api_client.get_repository_issues_time(
-            repository["owner"], repository["name"]
-        )
+        repository_issues = github_api_client.get_repository_issues_time(repository)
         if repository_issues is not None:
             update_flag = _update_statistics(
                 "statistics_issues",
@@ -135,7 +144,7 @@ if __name__ == "__main__":
                 {
                     "issues": repository_issues,
                 },
-                "issues time series",
+                "issues",
             )
 
         repository_workflows = github_api_client.get_repository_workflows(
@@ -163,7 +172,7 @@ if __name__ == "__main__":
                 {
                     "workflows": repository_workflow_runs,
                 },
-                "workflows time series",
+                "workflows",
             )
 
         repository_environments = github_api_client.get_repository_environments(
@@ -181,7 +190,9 @@ if __name__ == "__main__":
             )
 
         repository_deployments = github_api_client.get_repository_deployments(
-            repository["owner"], repository["name"]
+            repository["owner"],
+            repository["name"],
+            repository_environments if repository_environments else {},
         )
         if repository_deployments is not None:
             update_flag = _update_statistics(
@@ -191,7 +202,7 @@ if __name__ == "__main__":
                 {
                     "deployments": repository_deployments,
                 },
-                "deployments time series",
+                "deployments",
             )
 
         repository_pull_requests = github_api_client.get_repository_pull_requests_time(
@@ -205,12 +216,10 @@ if __name__ == "__main__":
                 {
                     "pull_requests": repository_pull_requests,
                 },
-                "pull requests time series",
+                "pull_requests",
             )
 
-        repository_forks = github_api_client.get_repository_forks(
-            repository["owner"], repository["name"]
-        )
+        repository_forks = github_api_client.get_repository_forks(repository)
         if repository_forks is not None:
             update_flag = _update_statistics(
                 "statistics_forks",
@@ -219,7 +228,7 @@ if __name__ == "__main__":
                 {
                     "forks": repository_forks,
                 },
-                "forks time series",
+                "forks",
             )
 
         # Update the metadata

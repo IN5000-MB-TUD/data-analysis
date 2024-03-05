@@ -1,6 +1,7 @@
 import logging
 import os
 from datetime import datetime
+from math import ceil
 
 import requests
 from pytz import utc
@@ -59,9 +60,24 @@ class GitHubAPI:
                 f"The request for repository {repository_owner}/{repository_name} returned a status code "
                 f"{github_api_response.status_code}: {github_api_response.reason}"
             )
-            return None
+            return None if github_api_response.status_code != 422 else {}
 
         return github_api_response.json()
+
+    def _request_page_increment(self, repository_age, item_count):
+        """
+        Compute the page increment for an API request to sample the data by month.
+
+        :param repository_age: The age of the repository, in seconds.
+        :param item_count: The total count of the item to sample.
+        :return: The API request page increment.
+        """
+        repository_age_months = ceil(repository_age / 2629746)
+        requests_count = ceil(item_count / 100)
+        time_series_stargazers_increment = max(
+            1, int(requests_count / repository_age_months)
+        )
+        return time_series_stargazers_increment
 
     def get_repository_data(self, repository_owner, repository_name):
         """
@@ -145,20 +161,58 @@ class GitHubAPI:
             for branch in github_api_response
         }
 
-    def get_repository_commits(self, repository_owner, repository_name):
+    def get_repository_commits_count(self, repository_owner, repository_name):
         """
-        Get commits from GitHub.
+        Get commits count from GitHub.
         The commits are taken from the main branch.
 
         :param repository_owner: The owner of the repository.
         :param repository_name: The name of the repository.
+        :return: The commits count from the GitHubAPI. None if an error occurs.
+        """
+        request_url = (
+            self.github_api_url
+            + f"{repository_owner}/{repository_name}/commits?per_page=1&page=1"
+        )
+
+        if not self._is_authenticated():
+            return None
+
+        github_api_response = requests.get(request_url, headers=self.headers)
+        if github_api_response.status_code != 200:
+            log.error(
+                f"The request for repository {repository_owner}/{repository_name} returned a status code "
+                f"{github_api_response.status_code}: {github_api_response.reason}"
+            )
+            return None
+
+        github_api_response_headers = github_api_response.headers
+        commits_count = int(
+            github_api_response_headers["Link"]
+            .split('>; rel="last"')[0]
+            .split("&page=")[-1]
+        )
+
+        return commits_count
+
+    def get_repository_commits(self, repository):
+        """
+        Get commits from GitHub.
+        The commits are taken from the main branch.
+
+        :param repository: The repository data.
         :return: The commits from the GitHubAPI. None if an error occurs.
         """
         response_page = 1
-        commits_count = 0
+        response_page_increment = self._request_page_increment(
+            repository["age"], repository["commits"]
+        )
         commits_to_add = 100
         commits_dates = {}
         commits_contributors = {}
+
+        repository_owner = repository["owner"]
+        repository_name = repository["name"]
         request_url = (
             self.github_api_url
             + f"{repository_owner}/{repository_name}/commits?per_page=100"
@@ -172,7 +226,7 @@ class GitHubAPI:
                 repository_name,
             )
             if github_api_response is None:
-                return None, None, None
+                return None, None
             else:
                 commits_to_add = len(github_api_response)
 
@@ -201,12 +255,9 @@ class GitHubAPI:
                         else:
                             commits_contributors[commit_author]["commits"] += 1
 
-                        # Increase counter
-                        commits_count += 1
+            response_page += response_page_increment
 
-            response_page += 1
-
-        return commits_count, commits_dates, commits_contributors
+        return commits_dates, commits_contributors
 
     def get_repository_releases(self, repository_owner, repository_name):
         """
@@ -281,19 +332,24 @@ class GitHubAPI:
 
         return len(github_api_response.get("sbom", {}).get("packages", []))
 
-    def get_repository_stargazers_time(self, repository_owner, repository_name):
+    def get_repository_stargazers_time(self, repository):
         """
         Get stargazers time data from GitHub.
 
-        :param repository_owner: The owner of the repository.
-        :param repository_name: The name of the repository.
+        :param repository: the repository data.
         :return: The stargazers time data from the GitHubAPI as a list. None if an error occurs.
         """
         headers = self.headers
         headers["Accept"] = "application/vnd.github.v3.star+json"
         response_page = 1
+        response_page_increment = self._request_page_increment(
+            repository["age"], repository["stargazers_count"]
+        )
         stargazers_to_add = 100
         repository_stargazers = []
+
+        repository_owner = repository["owner"]
+        repository_name = repository["name"]
         request_url = (
             self.github_api_url
             + f"{repository_owner}/{repository_name}/stargazers?per_page=100"
@@ -317,21 +373,26 @@ class GitHubAPI:
                                 stargaze["starred_at"], DATE_FORMAT
                             ).replace(tzinfo=utc),
                         )
-            response_page += 1
+            response_page += response_page_increment
 
         return repository_stargazers
 
-    def get_repository_issues_time(self, repository_owner, repository_name):
+    def get_repository_issues_time(self, repository):
         """
         Get issues time data from GitHub.
 
-        :param repository_owner: The owner of the repository.
-        :param repository_name: The name of the repository.
+        :param repository: the repository data.
         :return: The issues time data from the GitHubAPI as a dictionary. None if an error occurs.
         """
         response_page = 1
+        response_page_increment = self._request_page_increment(
+            repository["age"], repository["open_issues"]
+        )
         issues_to_add = 100
         repository_issues = {}
+
+        repository_owner = repository["owner"]
+        repository_name = repository["name"]
         request_url = (
             self.github_api_url
             + f"{repository_owner}/{repository_name}/issues?per_page=100"
@@ -356,7 +417,6 @@ class GitHubAPI:
                                 "number": issue["number"],
                                 "state": issue["state"],
                                 "title": issue["title"],
-                                "body": issue["body"],
                                 "user": issue["user"]["login"],
                                 "labels": {
                                     label["name"]: label["description"]
@@ -379,7 +439,7 @@ class GitHubAPI:
                             }
                         }
                     )
-            response_page += 1
+            response_page += response_page_increment
 
         return repository_issues
 
@@ -512,20 +572,30 @@ class GitHubAPI:
 
         return repository_environments
 
-    def get_repository_deployments(self, repository_owner, repository_name):
+    def get_repository_deployments(
+        self, repository_owner, repository_name, environments
+    ):
         """
         Get deployments time series data from GitHub.
 
         :param repository_owner: The owner of the repository.
         :param repository_name: The name of the repository.
+        :param environments: The repository environments.
         :return: The repository deployments time series data. None if an error occurs.
         """
         response_page = 1
         deployments_to_add = 100
         repository_deployments = {}
+
+        production_environment = "production"
+        for environment in environments:
+            if environment["name"].lower() in {"production", "release"}:
+                production_environment = environment["name"]
+                break
+
         request_url = (
             self.github_api_url
-            + f"{repository_owner}/{repository_name}/deployments?per_page=100"
+            + f"{repository_owner}/{repository_name}/deployments?environment={production_environment}per_page=100"
         )
 
         while deployments_to_add > 0:
@@ -615,17 +685,22 @@ class GitHubAPI:
 
         return repository_pull_request
 
-    def get_repository_forks(self, repository_owner, repository_name):
+    def get_repository_forks(self, repository):
         """
         Get forks time series data from GitHub.
 
-        :param repository_owner: The owner of the repository.
-        :param repository_name: The name of the repository.
+        :param repository: the repository data.
         :return: The repository forks time series data. None if an error occurs.
         """
         response_page = 1
+        response_page_increment = self._request_page_increment(
+            repository["age"], repository["forks_count"]
+        )
         forks_to_add = 100
         repository_forks = {}
+
+        repository_owner = repository["owner"]
+        repository_name = repository["name"]
         request_url = (
             self.github_api_url
             + f"{repository_owner}/{repository_name}/forks?per_page=100"
@@ -654,6 +729,6 @@ class GitHubAPI:
                             }
                         }
                     )
-            response_page += 1
+            response_page += response_page_increment
 
         return repository_forks
