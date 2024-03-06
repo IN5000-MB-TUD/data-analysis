@@ -162,3 +162,4 @@ cython_debug/
 
 results
 plots
+data/time_series_data.csv
