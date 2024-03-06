@@ -16,12 +16,14 @@ from utils.data import (
     get_metric_time_series,
     get_metrics_information,
 )
+from utils.main import normalize
 
 # Setup logging
 log = logging.getLogger(__name__)
 
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+REDUCE_FEATURES = False
 
 
 if __name__ == "__main__":
@@ -43,6 +45,7 @@ if __name__ == "__main__":
 
         # Gather metrics
         stargazers_dates, stargazers_cumulative = get_stargazers_time_series(repository)
+        stargazers_cumulative = normalize(stargazers_cumulative, 0, 1)
         metrics_values_pairs.append(zip(stargazers_dates, stargazers_cumulative))
         metrics_values_single.append(zip(stargazers_dates, stargazers_cumulative))
 
@@ -55,6 +58,7 @@ if __name__ == "__main__":
                 metric[3],
             )
 
+            metric_cumulative = normalize(metric_cumulative, 0, 1)
             metrics_values_pairs.append(zip(metric_dates, metric_cumulative))
             metrics_values_single.append(zip(metric_dates, metric_cumulative))
 
@@ -71,9 +75,10 @@ if __name__ == "__main__":
     model_type = "Hierarchical"  # clustering model
 
     # Feature selection
-    context = {"model_type": model_type, "transform_type": transform_type}
-    top_feats = feature_selection(df_feats, labels={}, context=context)
-    df_feats = df_feats[top_feats]
+    if REDUCE_FEATURES:
+        context = {"model_type": model_type, "transform_type": transform_type}
+        top_feats = feature_selection(df_feats, labels={}, context=context)
+        df_feats = df_feats[top_feats]
 
     # Scale features
     prep = MinMaxScaler()

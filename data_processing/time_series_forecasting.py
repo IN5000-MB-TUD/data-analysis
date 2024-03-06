@@ -41,26 +41,49 @@ if __name__ == "__main__":
             )
             stargazers_time_series = list(zip(stargazers_dates, stargazers_cumulative))
 
-            issues_dates, issues_cumulative = get_metric_time_series(repository, "statistics_issues", "issues", "created_at", "open_issues")
+            issues_dates, issues_cumulative = get_metric_time_series(
+                repository, "statistics_issues", "issues", "created_at", "open_issues"
+            )
             issues_time_series = list(zip(issues_dates, issues_cumulative))
 
-            commits_dates, commits_cumulative = get_metric_time_series(repository, "statistics_commits", "commits", "date", "commits")
+            commits_dates, commits_cumulative = get_metric_time_series(
+                repository, "statistics_commits", "commits", "date", "commits"
+            )
             commits_time_series = list(zip(commits_dates, commits_cumulative))
 
-            contributors_dates, contributors_cumulative = get_metric_time_series(repository, "statistics_commits", "contributors",
-                                                                       "first_commit", None)
-            contributors_time_series = list(zip(contributors_dates, contributors_cumulative))
+            contributors_dates, contributors_cumulative = get_metric_time_series(
+                repository, "statistics_commits", "contributors", "first_commit", None
+            )
+            contributors_time_series = list(
+                zip(contributors_dates, contributors_cumulative)
+            )
 
-            deployments_dates, deployments_cumulative = get_metric_time_series(repository, "statistics_deployments", "deployments", "created_at", None)
-            deployments_time_series = list(zip(deployments_dates, deployments_cumulative))
+            deployments_dates, deployments_cumulative = get_metric_time_series(
+                repository, "statistics_deployments", "deployments", "created_at", None
+            )
+            deployments_time_series = list(
+                zip(deployments_dates, deployments_cumulative)
+            )
 
-            forks_dates, forks_cumulative = get_metric_time_series(repository, "statistics_forks", "forks", "created_at", "forks_count")
+            forks_dates, forks_cumulative = get_metric_time_series(
+                repository, "statistics_forks", "forks", "created_at", "forks_count"
+            )
             forks_time_series = list(zip(forks_dates, forks_cumulative))
 
-            pull_requests_dates, pull_requests_cumulative = get_metric_time_series(repository, "statistics_pull_requests", "pull_requests", "created_at", None)
-            pull_requests_time_series = list(zip(pull_requests_dates, pull_requests_cumulative))
+            pull_requests_dates, pull_requests_cumulative = get_metric_time_series(
+                repository,
+                "statistics_pull_requests",
+                "pull_requests",
+                "created_at",
+                None,
+            )
+            pull_requests_time_series = list(
+                zip(pull_requests_dates, pull_requests_cumulative)
+            )
 
-            workflows_dates, workflows_cumulative = get_metric_time_series(repository, "statistics_workflow_runs", "workflows", "created_at", None)
+            workflows_dates, workflows_cumulative = get_metric_time_series(
+                repository, "statistics_workflow_runs", "workflows", "created_at", None
+            )
             workflows_time_series = list(zip(workflows_dates, workflows_cumulative))
 
             # Combine the time series
@@ -76,8 +99,11 @@ if __name__ == "__main__":
             ]
 
             for i in range(0, len(time_series_combination)):
-                for j in range(i+1, len(time_series_combination)):
-                    time_series_combination[i], time_series_combination[j] = merge_time_series(
+                for j in range(i + 1, len(time_series_combination)):
+                    (
+                        time_series_combination[i],
+                        time_series_combination[j],
+                    ) = merge_time_series(
                         time_series_combination[i], time_series_combination[j]
                     )
 
@@ -156,14 +182,78 @@ if __name__ == "__main__":
     # Initialize settings
     h = FORECAST_HORIZON_MONTHS
     training_settings = {
-        "stargazers": ["issues", "commits", "contributors", "deployments", "forks", "pull_requests", "workflows"],
-        "issues": ["stargazers", "commits", "contributors", "deployments", "forks", "pull_requests", "workflows"],
-        "commits": ["stargazers", "issues", "contributors", "deployments", "forks", "pull_requests", "workflows"],
-        "contributors": ["stargazers", "issues", "commits", "deployments", "forks", "pull_requests", "workflows"],
-        "deployments": ["stargazers", "issues", "commits", "contributors", "forks", "pull_requests", "workflows"],
-        "forks": ["stargazers", "issues", "commits", "contributors", "deployments", "pull_requests", "workflows"],
-        "pull_requests": ["stargazers", "issues", "commits", "contributors", "deployments", "forks", "workflows"],
-        "workflows": ["stargazers", "issues", "commits", "contributors", "deployments", "forks", "pull_requests"],
+        "stargazers": [
+            "issues",
+            "commits",
+            "contributors",
+            "deployments",
+            "forks",
+            "pull_requests",
+            "workflows",
+        ],
+        "issues": [
+            "stargazers",
+            "commits",
+            "contributors",
+            "deployments",
+            "forks",
+            "pull_requests",
+            "workflows",
+        ],
+        "commits": [
+            "stargazers",
+            "issues",
+            "contributors",
+            "deployments",
+            "forks",
+            "pull_requests",
+            "workflows",
+        ],
+        "contributors": [
+            "stargazers",
+            "issues",
+            "commits",
+            "deployments",
+            "forks",
+            "pull_requests",
+            "workflows",
+        ],
+        "deployments": [
+            "stargazers",
+            "issues",
+            "commits",
+            "contributors",
+            "forks",
+            "pull_requests",
+            "workflows",
+        ],
+        "forks": [
+            "stargazers",
+            "issues",
+            "commits",
+            "contributors",
+            "deployments",
+            "pull_requests",
+            "workflows",
+        ],
+        "pull_requests": [
+            "stargazers",
+            "issues",
+            "commits",
+            "contributors",
+            "deployments",
+            "forks",
+            "workflows",
+        ],
+        "workflows": [
+            "stargazers",
+            "issues",
+            "commits",
+            "contributors",
+            "deployments",
+            "forks",
+            "pull_requests",
+        ],
     }
 
     for feature_target, dynamic_features in training_settings.items():
