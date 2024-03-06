@@ -3,7 +3,9 @@ from connection import mo
 
 def get_stargazers_time_series(repository):
     """Get repository stargazers time series"""
-    repository_stargazers = mo.db["statistics_stargazers"].find_one({"repository_id": repository["_id"]})
+    repository_stargazers = mo.db["statistics_stargazers"].find_one(
+        {"repository_id": repository["_id"]}
+    )
     if not repository_stargazers:
         return [], []
 
@@ -20,19 +22,30 @@ def get_stargazers_time_series(repository):
     return stargazers, stargazers_cumulative
 
 
-def get_issues_time_series(repository):
-    """Get repository issues time series"""
-    issues_dates = [repository["created_at"]] + [
-        issue["created_at"] for issue in repository["statistics"]["issues"].values()
+def get_metric_time_series(
+    repository, metric_collection, metric_name, date_field, total_value=None
+):
+    """Get repository metric time series"""
+    repository_metric = mo.db[metric_collection].find_one(
+        {"repository_id": repository["_id"]}
+    )
+    if not repository_metric:
+        return [], []
+
+    metric_dates = [repository["created_at"]] + [
+        metric[date_field] for metric in repository_metric[metric_name].values()
     ]
-    issues_dates.sort()
-    issues_cumulative = [0]
-    issues_counter = 0
-    for i in range(1, len(issues_dates)):
-        issues_counter += 1
-        issues_cumulative.append(issues_counter)
+    metric_dates.sort()
+    metric_cumulative = [0]
+    metric_counter = 0
+    for i in range(1, len(metric_dates)):
+        metric_counter += 1
+        metric_cumulative.append(metric_counter)
 
-    issues_cumulative.append(repository["open_issues"])
-    issues_dates.append(repository["metadata"]["modified"])
+    if total_value is not None:
+        metric_cumulative.append(repository[total_value])
+    else:
+        metric_cumulative.append(metric_counter)
+    metric_dates.append(repository["metadata"]["modified"])
 
-    return issues_dates, issues_cumulative
+    return metric_dates, metric_cumulative

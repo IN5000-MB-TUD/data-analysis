@@ -10,9 +10,10 @@ from sklearn.preprocessing import MinMaxScaler
 from connection import mo
 from data_processing.t2f.extraction.extractor import feature_extraction
 from data_processing.t2f.model.clustering import ClusterWrapper
+from data_processing.t2f.selection.selection import feature_selection
 from utils.data import (
     get_stargazers_time_series,
-    get_issues_time_series,
+    get_metric_time_series,
 )
 from utils.time_series import (
     build_time_series,
@@ -39,33 +40,39 @@ if __name__ == "__main__":
         log.info("Analyzing repository {}".format(repository["full_name"]))
 
         repositories_names.append(repository["full_name"])
+        metrics_values_pairs = []
+        metrics_values_single = []
 
-        if repository["statistics"].get("stargazers", []):
-            stargazers, stargazers_cumulative = get_stargazers_time_series(repository)
-        else:
-            stargazers, stargazers_cumulative = build_time_series(
-                repository, "stargazers_count"
+        # Gather metrics
+        stargazers_dates, stargazers_cumulative = get_stargazers_time_series(repository)
+        metrics_values_pairs.append(zip(stargazers_dates, stargazers_cumulative))
+        metrics_values_single.append(zip(stargazers_dates, stargazers_cumulative))
+
+        metrics = [
+            ("statistics_commits", "commits", "date", "commits"),
+            ("statistics_commits", "contributors", "first_commit", None),
+            ("statistics_deployments", "deployments", "created_at", None),
+            ("statistics_issues", "issues", "created_at", "open_issues"),
+            ("statistics_forks", "forks", "created_at", "forks_count"),
+            ("statistics_pull_requests", "pull_requests", "created_at", None),
+            ("statistics_workflow_runs", "workflows", "created_at", None),
+        ]
+
+        for metric in metrics:
+            metric_dates, metric_cumulative = get_metric_time_series(
+                repository,
+                metric[0],
+                metric[1],
+                metric[2],
+                metric[3],
             )
 
-        if repository["statistics"].get("issues", []):
-            issues_dates, issues_cumulative = get_issues_time_series(repository)
-        else:
-            issues_dates, issues_cumulative = build_time_series(
-                repository, "open_issues"
-            )
+            metrics_values_pairs.append(zip(metric_dates, metric_cumulative))
+            metrics_values_single.append(zip(metric_dates, metric_cumulative))
 
-        repos_matrix_pairs.append(
-            [
-                zip(stargazers, stargazers_cumulative),
-                zip(issues_dates, issues_cumulative),
-            ]
-        )
-        repos_matrix_single.append(
-            [
-                zip(stargazers, stargazers_cumulative),
-                zip(issues_dates, issues_cumulative),
-            ]
-        )
+        # Populate data frame
+        repos_matrix_pairs.append(metrics_values_pairs)
+        repos_matrix_single.append(metrics_values_single)
 
     # Feature extraction
     df_feats = feature_extraction(
@@ -76,9 +83,9 @@ if __name__ == "__main__":
     model_type = "Hierarchical"  # clustering model
 
     # Feature selection
-    # context = {'model_type': model_type, 'transform_type': transform_type}
-    # top_feats = feature_selection(df_feats, labels={}, context=context)
-    # df_feats = df_feats[top_feats]
+    context = {'model_type': model_type, 'transform_type': transform_type}
+    top_feats = feature_selection(df_feats, labels={}, context=context)
+    df_feats = df_feats[top_feats]
 
     # Scale features
     prep = MinMaxScaler()

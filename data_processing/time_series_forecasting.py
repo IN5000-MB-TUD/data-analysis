@@ -59,9 +59,7 @@ if __name__ == "__main__":
 
             issues_time_series = list(zip(issues_dates, issues_cumulative))
 
-            commits_dates, commits_cumulative = build_time_series(
-                repository, "commits"
-            )
+            commits_dates, commits_cumulative = build_time_series(repository, "commits")
 
             commits_time_series = list(zip(commits_dates, commits_cumulative))
 
