@@ -12,12 +12,9 @@ from xgboost import XGBRegressor
 from connection import mo
 from utils.data import (
     get_stargazers_time_series,
-    get_issues_time_series,
+    get_metric_time_series,
 )
-from utils.time_series import (
-    build_time_series,
-    merge_time_series,
-)
+from utils.time_series import merge_time_series
 
 # Setup logging
 log = logging.getLogger(__name__)
@@ -39,40 +36,59 @@ if __name__ == "__main__":
         for idx, repository in enumerate(repositories):
             log.info("Analyzing repository {}".format(repository["full_name"]))
 
-            if repository["statistics"].get("stargazers", []):
-                stargazers, stargazers_cumulative = get_stargazers_time_series(
-                    repository
-                )
-            else:
-                stargazers, stargazers_cumulative = build_time_series(
-                    repository, "stargazers_count"
-                )
+            stargazers_dates, stargazers_cumulative = get_stargazers_time_series(
+                repository
+            )
+            stargazers_time_series = list(zip(stargazers_dates, stargazers_cumulative))
 
-            stargazers_time_series = list(zip(stargazers, stargazers_cumulative))
-
-            if repository["statistics"].get("issues", []):
-                issues_dates, issues_cumulative = get_issues_time_series(repository)
-            else:
-                issues_dates, issues_cumulative = build_time_series(
-                    repository, "open_issues"
-                )
-
+            issues_dates, issues_cumulative = get_metric_time_series(repository, "statistics_issues", "issues", "created_at", "open_issues")
             issues_time_series = list(zip(issues_dates, issues_cumulative))
 
-            commits_dates, commits_cumulative = build_time_series(repository, "commits")
-
+            commits_dates, commits_cumulative = get_metric_time_series(repository, "statistics_commits", "commits", "date", "commits")
             commits_time_series = list(zip(commits_dates, commits_cumulative))
 
+            contributors_dates, contributors_cumulative = get_metric_time_series(repository, "statistics_commits", "contributors",
+                                                                       "first_commit", None)
+            contributors_time_series = list(zip(contributors_dates, contributors_cumulative))
+
+            deployments_dates, deployments_cumulative = get_metric_time_series(repository, "statistics_deployments", "deployments", "created_at", None)
+            deployments_time_series = list(zip(deployments_dates, deployments_cumulative))
+
+            forks_dates, forks_cumulative = get_metric_time_series(repository, "statistics_forks", "forks", "created_at", "forks_count")
+            forks_time_series = list(zip(forks_dates, forks_cumulative))
+
+            pull_requests_dates, pull_requests_cumulative = get_metric_time_series(repository, "statistics_pull_requests", "pull_requests", "created_at", None)
+            pull_requests_time_series = list(zip(pull_requests_dates, pull_requests_cumulative))
+
+            workflows_dates, workflows_cumulative = get_metric_time_series(repository, "statistics_workflow_runs", "workflows", "created_at", None)
+            workflows_time_series = list(zip(workflows_dates, workflows_cumulative))
+
             # Combine the time series
-            stargazers_time_series, issues_time_series = merge_time_series(
-                stargazers_time_series, issues_time_series
-            )
-            stargazers_time_series, commits_time_series = merge_time_series(
-                stargazers_time_series, commits_time_series
-            )
-            issues_time_series, commits_time_series = merge_time_series(
-                issues_time_series, commits_time_series
-            )
+            time_series_combination = [
+                stargazers_time_series,
+                issues_time_series,
+                commits_time_series,
+                contributors_time_series,
+                deployments_time_series,
+                forks_time_series,
+                pull_requests_time_series,
+                workflows_time_series,
+            ]
+
+            for i in range(0, len(time_series_combination)):
+                for j in range(i+1, len(time_series_combination)):
+                    time_series_combination[i], time_series_combination[j] = merge_time_series(
+                        time_series_combination[i], time_series_combination[j]
+                    )
+
+            stargazers_time_series = time_series_combination[0]
+            issues_time_series = time_series_combination[1]
+            commits_time_series = time_series_combination[2]
+            contributors_time_series = time_series_combination[3]
+            deployments_time_series = time_series_combination[4]
+            forks_time_series = time_series_combination[5]
+            pull_requests_time_series = time_series_combination[6]
+            workflows_time_series = time_series_combination[7]
 
             # Sample by month
             repository_age_months = ceil(repository["age"] / 2629746)
@@ -98,6 +114,11 @@ if __name__ == "__main__":
                         "stargazers": stargazers_time_series[time_series_idx][1],
                         "issues": issues_time_series[time_series_idx][1],
                         "commits": commits_time_series[time_series_idx][1],
+                        "contributors": contributors_time_series[time_series_idx][1],
+                        "deployments": deployments_time_series[time_series_idx][1],
+                        "forks": forks_time_series[time_series_idx][1],
+                        "pull_requests": pull_requests_time_series[time_series_idx][1],
+                        "workflows": workflows_time_series[time_series_idx][1],
                     }
                 )
 
@@ -116,6 +137,11 @@ if __name__ == "__main__":
                 "stargazers",
                 "issues",
                 "commits",
+                "contributors",
+                "deployments",
+                "forks",
+                "pull_requests",
+                "workflows",
             ],
         )
         df_multi_time_series.to_csv("../data/time_series_data.csv", index=False)
@@ -130,9 +156,14 @@ if __name__ == "__main__":
     # Initialize settings
     h = FORECAST_HORIZON_MONTHS
     training_settings = {
-        "stargazers": ["issues", "commits"],
-        "issues": ["stargazers", "commits"],
-        "commits": ["stargazers", "issues"],
+        "stargazers": ["issues", "commits", "contributors", "deployments", "forks", "pull_requests", "workflows"],
+        "issues": ["stargazers", "commits", "contributors", "deployments", "forks", "pull_requests", "workflows"],
+        "commits": ["stargazers", "issues", "contributors", "deployments", "forks", "pull_requests", "workflows"],
+        "contributors": ["stargazers", "issues", "commits", "deployments", "forks", "pull_requests", "workflows"],
+        "deployments": ["stargazers", "issues", "commits", "contributors", "forks", "pull_requests", "workflows"],
+        "forks": ["stargazers", "issues", "commits", "contributors", "deployments", "pull_requests", "workflows"],
+        "pull_requests": ["stargazers", "issues", "commits", "contributors", "deployments", "forks", "workflows"],
+        "workflows": ["stargazers", "issues", "commits", "contributors", "deployments", "forks", "pull_requests"],
     }
 
     for feature_target, dynamic_features in training_settings.items():
@@ -168,10 +199,6 @@ if __name__ == "__main__":
         # Setup the forecasting model
         log.info("Setup model")
         models = [
-            # make_pipeline(
-            #     SimpleImputer(),
-            #     RandomForestRegressor(random_state=0, n_estimators=100)
-            # ),
             XGBRegressor(random_state=0, n_estimators=100, device="cuda"),
         ]
 
