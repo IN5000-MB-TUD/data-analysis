@@ -15,7 +15,6 @@ from data_processing.utils import (
     get_stargazers_time_series,
     build_time_series,
     get_issues_time_series,
-    get_additions_deletions_time_series,
 )
 
 # Setup logging
@@ -54,28 +53,16 @@ if __name__ == "__main__":
                 repository, "open_issues"
             )
 
-        if repository["statistics"].get("commits_weekly", []):
-            (
-                commits_dates,
-                commits_cumulative,
-                _,
-                _,
-            ) = get_additions_deletions_time_series(repository)
-        else:
-            commits_dates, commits_cumulative = build_time_series(repository, "commits")
-
         repos_matrix_pairs.append(
             [
                 zip(stargazers, stargazers_cumulative),
                 zip(issues_dates, issues_cumulative),
-                zip(commits_dates, commits_cumulative),
             ]
         )
         repos_matrix_single.append(
             [
                 zip(stargazers, stargazers_cumulative),
                 zip(issues_dates, issues_cumulative),
-                zip(commits_dates, commits_cumulative),
             ]
         )
 

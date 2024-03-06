@@ -83,9 +83,6 @@ if __name__ == "__main__":
                 "branches": github_api_client.get_repository_branches(
                     repository_owner, repository_name
                 ),
-                "commits": github_api_client.get_repository_commits_count(
-                    repository_owner, repository_name
-                ),
                 "releases": github_api_client.get_repository_releases(
                     repository_owner, repository_name
                 ),
