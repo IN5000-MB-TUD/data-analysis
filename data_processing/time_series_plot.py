@@ -5,7 +5,8 @@ from matplotlib import pyplot as plt
 from connection import mo
 from utils.data import (
     get_stargazers_time_series,
-    get_issues_time_series,
+    get_metric_time_series,
+    get_metrics_information,
 )
 
 # Setup logging
@@ -49,47 +50,48 @@ if __name__ == "__main__":
     log.info("Start GitHub statistics retrieval from Database")
 
     # Get the repositories in the database
-    repositories = mo.db["repositories_data"].find()
+    repositories = mo.db["repositories_data"].find({"statistics": {"$exists": True}})
 
     for idx, repository in enumerate(repositories):
-        log.info("Analyzing repository {}".format(repository["full_name"]))
+        log.info("Plotting metrics for repository {}".format(repository["full_name"]))
 
-        # Process stargazers
-        if (
-            repository.get("statistics", {}).get("stargazers")
-            and repository["stargazers_count"] > 0
-        ):
-            stargazers, stargazers_cumulative = get_stargazers_time_series(repository)
+        # Plot metrics
+        stargazers, stargazers_cumulative = get_stargazers_time_series(repository)
 
-            _create_plot(
-                "../results/stargazers/{}_{}_{}.png".format(
-                    idx, repository["owner"], repository["name"]
-                ),
-                "Stargazers {}".format(repository["full_name"]),
-                "Total: {}".format(repository["stargazers_count"]),
-                "Date",
-                "Count",
-                stargazers,
-                [stargazers_cumulative],
+        _create_plot(
+            "../plots/stargazers/{}_{}_{}.png".format(
+                idx, repository["owner"], repository["name"]
+            ),
+            "Stargazers {}".format(repository["full_name"]),
+            "Total: {}".format(repository["stargazers_count"]),
+            "Date",
+            "Count",
+            stargazers,
+            [stargazers_cumulative],
+        )
+
+        for metric in get_metrics_information():
+            metric_dates, metric_cumulative = get_metric_time_series(
+                repository,
+                metric[0],
+                metric[1],
+                metric[2],
+                metric[3],
             )
 
-        # Process open issues
-        if (
-            repository.get("statistics", {}).get("issues")
-            and repository["open_issues"] > 0
-        ):
-            issues_dates, issues_cumulative = get_issues_time_series(repository)
+            if len(metric_cumulative) == 0:
+                continue
 
             _create_plot(
-                "../results/issues/{}_{}_{}.png".format(
-                    idx, repository["owner"], repository["name"]
+                "../plots/{}/{}_{}_{}.png".format(
+                    metric[1], idx, repository["owner"], repository["name"]
                 ),
-                "Open Issues {}".format(repository["full_name"]),
-                "Total: {}".format(repository["open_issues"]),
+                "{} {}".format(metric[1], repository["full_name"]),
+                "Total: {}".format(metric_cumulative[-1]),
                 "Date",
                 "Count",
-                issues_dates,
-                [issues_cumulative],
+                metric_dates,
+                [metric_cumulative],
             )
 
         log.info("------------------------")

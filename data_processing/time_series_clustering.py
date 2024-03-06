@@ -14,9 +14,7 @@ from data_processing.t2f.selection.selection import feature_selection
 from utils.data import (
     get_stargazers_time_series,
     get_metric_time_series,
-)
-from utils.time_series import (
-    build_time_series,
+    get_metrics_information,
 )
 
 # Setup logging
@@ -48,17 +46,7 @@ if __name__ == "__main__":
         metrics_values_pairs.append(zip(stargazers_dates, stargazers_cumulative))
         metrics_values_single.append(zip(stargazers_dates, stargazers_cumulative))
 
-        metrics = [
-            ("statistics_commits", "commits", "date", "commits"),
-            ("statistics_commits", "contributors", "first_commit", None),
-            ("statistics_deployments", "deployments", "created_at", None),
-            ("statistics_issues", "issues", "created_at", "open_issues"),
-            ("statistics_forks", "forks", "created_at", "forks_count"),
-            ("statistics_pull_requests", "pull_requests", "created_at", None),
-            ("statistics_workflow_runs", "workflows", "created_at", None),
-        ]
-
-        for metric in metrics:
+        for metric in get_metrics_information():
             metric_dates, metric_cumulative = get_metric_time_series(
                 repository,
                 metric[0],
@@ -83,7 +71,7 @@ if __name__ == "__main__":
     model_type = "Hierarchical"  # clustering model
 
     # Feature selection
-    context = {'model_type': model_type, 'transform_type': transform_type}
+    context = {"model_type": model_type, "transform_type": transform_type}
     top_feats = feature_selection(df_feats, labels={}, context=context)
     df_feats = df_feats[top_feats]
 

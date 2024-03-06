@@ -1,6 +1,19 @@
 from connection import mo
 
 
+def get_metrics_information():
+    """Return a list of the metrics information."""
+    return [
+        ("statistics_commits", "commits", "date", "commits"),
+        ("statistics_commits", "contributors", "first_commit", None),
+        ("statistics_deployments", "deployments", "created_at", None),
+        ("statistics_issues", "issues", "created_at", "open_issues"),
+        ("statistics_forks", "forks", "created_at", "forks_count"),
+        ("statistics_pull_requests", "pull_requests", "created_at", None),
+        ("statistics_workflow_runs", "workflows", "created_at", None),
+    ]
+
+
 def get_stargazers_time_series(repository):
     """Get repository stargazers time series"""
     repository_stargazers = mo.db["statistics_stargazers"].find_one(
