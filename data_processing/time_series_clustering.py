@@ -10,11 +10,12 @@ from sklearn.preprocessing import MinMaxScaler
 from connection import mo
 from data_processing.t2f.extraction.extractor import feature_extraction
 from data_processing.t2f.model.clustering import ClusterWrapper
-from data_processing.t2f.selection.selection import feature_selection
-from data_processing.utils import (
+from utils.data import (
     get_stargazers_time_series,
-    build_time_series,
     get_issues_time_series,
+)
+from utils.time_series import (
+    build_time_series,
 )
 
 # Setup logging

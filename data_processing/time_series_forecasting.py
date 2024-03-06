@@ -6,18 +6,16 @@ from pathlib import Path
 import pandas as pd
 from mlforecast import MLForecast
 from mlforecast.target_transforms import Differences
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.impute import SimpleImputer
-from sklearn.pipeline import make_pipeline
 from utilsforecast.plotting import plot_series
 from xgboost import XGBRegressor
 
 from connection import mo
-from data_processing.utils import (
+from utils.data import (
     get_stargazers_time_series,
-    build_time_series,
     get_issues_time_series,
-    get_additions_deletions_time_series,
+)
+from utils.time_series import (
+    build_time_series,
     merge_time_series,
 )
 
@@ -61,17 +59,9 @@ if __name__ == "__main__":
 
             issues_time_series = list(zip(issues_dates, issues_cumulative))
 
-            if repository["statistics"].get("commits_weekly", []):
-                (
-                    commits_dates,
-                    commits_cumulative,
-                    _,
-                    _,
-                ) = get_additions_deletions_time_series(repository)
-            else:
-                commits_dates, commits_cumulative = build_time_series(
-                    repository, "commits"
-                )
+            commits_dates, commits_cumulative = build_time_series(
+                repository, "commits"
+            )
 
             commits_time_series = list(zip(commits_dates, commits_cumulative))
 

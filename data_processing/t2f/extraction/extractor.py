@@ -7,7 +7,7 @@ import multiprocessing as mp
 
 from data_processing.t2f.extraction.extractor_pair import extract_pair_features
 from data_processing.t2f.extraction.extractor_single import extract_univariate_features
-from data_processing.utils import (
+from utils.time_series import (
     merge_time_series,
     compute_time_series_segments_trends,
     compute_pattern_distance,
