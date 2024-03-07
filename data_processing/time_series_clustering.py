@@ -92,7 +92,9 @@ if __name__ == "__main__":
 
     # Scale features
     prep = MinMaxScaler()
-    df_feats = prep.fit_transform(df_feats)
+    for column_name, _ in df_feats.items():
+        if "single__" in column_name:
+            df_feats[[column_name]] = prep.fit_transform(df_feats[[column_name]])
 
     # Clustering
     best_fit = -1
