@@ -161,3 +161,5 @@ cython_debug/
 .vscode/
 
 results
+plots
+data/time_series_data.csv
