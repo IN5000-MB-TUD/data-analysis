@@ -60,7 +60,12 @@ class GitHubAPI:
                 f"The request for repository {repository_owner}/{repository_name} returned a status code "
                 f"{github_api_response.status_code}: {github_api_response.reason}"
             )
-            return None if github_api_response.status_code != 422 and github_api_response.status_code != 204 else {}
+            return (
+                None
+                if github_api_response.status_code != 422
+                and github_api_response.status_code != 204
+                else {}
+            )
 
         return github_api_response.json()
 

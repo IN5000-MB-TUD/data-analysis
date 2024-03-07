@@ -46,7 +46,12 @@ if __name__ == "__main__":
         # Gather metrics
         stargazers_dates, stargazers_cumulative = get_stargazers_time_series(repository)
         stargazers_cumulative = normalize(stargazers_cumulative, 0, 1)
-        metrics_values_pairs.append(zip(stargazers_dates, stargazers_cumulative))
+        metrics_values_pairs.append(
+            [
+                (stargazers_dates[i], stargazers_cumulative[i])
+                for i in range(len(stargazers_cumulative))
+            ]
+        )
         metrics_values_single.append(zip(stargazers_dates, stargazers_cumulative))
 
         for metric in get_metrics_information():
@@ -59,7 +64,12 @@ if __name__ == "__main__":
             )
 
             metric_cumulative = normalize(metric_cumulative, 0, 1)
-            metrics_values_pairs.append(zip(metric_dates, metric_cumulative))
+            metrics_values_pairs.append(
+                [
+                    (metric_dates[i], metric_cumulative[i])
+                    for i in range(len(metric_cumulative))
+                ]
+            )
             metrics_values_single.append(zip(metric_dates, metric_cumulative))
 
         # Populate data frame
@@ -68,7 +78,7 @@ if __name__ == "__main__":
 
     # Feature extraction
     df_feats = feature_extraction(
-        np.array(repos_matrix_pairs), np.array(repos_matrix_single), batch_size=100, p=1
+        repos_matrix_pairs, np.array(repos_matrix_single), batch_size=100, p=1
     )
 
     transform_type = "std"  # preprocessing step

@@ -94,9 +94,8 @@ def compute_time_series_segments_trends(time_series):
         trend_timestamp = time_series[current_idx][0]
         if time_series[previous_idx][1] < time_series[current_idx][1]:
             trend_status = 1
-        elif time_series[previous_idx][1] == time_series[current_idx][1]:
-            trend_status = 0
         else:
+            # Accentuate the constant trend as repository time series either grow or stabilize.
             trend_status = -1
 
         segments_trends.append((trend_timestamp, trend_status))
@@ -124,10 +123,10 @@ def merge_segments_trends(trend_1, trend_2):
 
     # Make sure that the lists are populated
     if not trend_1:
-        trend_1 = [(trends_times[0], 0)]
+        trend_1 = [(trends_times[0], -1)]
 
     if not trend_2:
-        trend_2 = [(trends_times[0], 0)]
+        trend_2 = [(trends_times[0], -1)]
 
     for trend_timestamp in trends_times:
         # Trends 1
@@ -136,9 +135,9 @@ def merge_segments_trends(trend_1, trend_2):
                 trends_1_adjusted.append((trend_timestamp, trend_1[trends_1_idx][1]))
                 trends_1_idx += 1
             else:
-                trends_1_adjusted.append((trend_timestamp, 0))
+                trends_1_adjusted.append((trend_timestamp, -1))
         else:
-            trends_1_adjusted.append((trend_timestamp, 0))
+            trends_1_adjusted.append((trend_timestamp, -1))
 
         # Trends 2
         if trends_2_idx < len(trend_2):
@@ -146,9 +145,9 @@ def merge_segments_trends(trend_1, trend_2):
                 trends_2_adjusted.append((trend_timestamp, trend_2[trends_2_idx][1]))
                 trends_2_idx += 1
             else:
-                trends_2_adjusted.append((trend_timestamp, 0))
+                trends_2_adjusted.append((trend_timestamp, -1))
         else:
-            trends_2_adjusted.append((trend_timestamp, 0))
+            trends_2_adjusted.append((trend_timestamp, -1))
 
     return trends_1_adjusted, trends_2_adjusted
 

@@ -7,11 +7,7 @@ import multiprocessing as mp
 
 from data_processing.t2f.extraction.extractor_pair import extract_pair_features
 from data_processing.t2f.extraction.extractor_single import extract_univariate_features
-from utils.time_series import (
-    merge_time_series,
-    compute_time_series_segments_trends,
-    compute_pattern_distance,
-)
+from utils.time_series import merge_time_series
 
 
 def padding_series(ts_list: list):
@@ -102,16 +98,16 @@ def extract_single_series_features_batch(
     return df_features
 
 
-def extract_pair_series_features(mts: np.array):
+def extract_pair_series_features(mts: list):
     """Extract features for each time series pair"""
     features_pair = {}  # Initialize an empty dictionary to save extracted features
 
     # Extract each possible combination pair
-    indexes = np.arange(mts.shape[0])
+    indexes = np.arange(len(mts))
     combs = list(itertools.combinations(indexes, r=2))
     for i, j in combs:
         # Extract pair features for each pair in the multivariate time series
-        mts_i, mts_j = merge_time_series(list(mts[i]), list(mts[j]))
+        mts_i, mts_j = merge_time_series(mts[i], mts[j])
 
         # Convert datetimes to timestamps
         mts_i = [
@@ -123,17 +119,8 @@ def extract_pair_series_features(mts: np.array):
             for mts_j_time, mts_j_value in mts_j
         ]
 
-        # Compute segments
-        mts_i_segments = compute_time_series_segments_trends(mts_i)
-        mts_j_segments = compute_time_series_segments_trends(mts_j)
-
         # Calculate distances between time series
-        mts_i = [mts_i_value for _, mts_i_value in mts_i]
-        mts_j = [mts_j_value for _, mts_j_value in mts_j]
-        feature = extract_pair_features(np.array(mts_i), np.array(mts_j))
-
-        # Add pattern distance
-        feature["pattern"] = compute_pattern_distance(mts_i_segments, mts_j_segments)
+        feature = extract_pair_features(mts_i, mts_j)
 
         # Rename key by inserting the feature name
         feature = {
@@ -217,7 +204,7 @@ def feature_extraction(
         index += size
 
     # Multi processing script execution
-    if num_batch == 1:
+    if num_batch < 5:
         df_features = feature_extraction_simple(ts_list, ts_list_single, batch_size)
     else:
         pool = mp.Pool(max_pool)
