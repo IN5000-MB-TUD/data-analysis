@@ -636,21 +636,31 @@ class GitHubAPI:
 
         return repository_deployments
 
-    def get_repository_pull_requests_time(self, repository_owner, repository_name):
+    def get_repository_pull_requests_time(
+        self, repository_owner, repository_name, base_branch=""
+    ):
         """
         Get pull request time series data from GitHub.
 
         :param repository_owner: The owner of the repository.
         :param repository_name: The name of the repository.
+        :param base_branch: The base branch the changes are pulled into.
         :return: The repository pull request time series data. None if an error occurs.
         """
         response_page = 1
         pull_request_to_add = 100
         repository_pull_request = {}
-        request_url = (
-            self.github_api_url
-            + f"{repository_owner}/{repository_name}/pulls?per_page=100"
-        )
+
+        if base_branch:
+            request_url = (
+                self.github_api_url
+                + f"{repository_owner}/{repository_name}/pulls?base={base_branch}&per_page=100"
+            )
+        else:
+            request_url = (
+                self.github_api_url
+                + f"{repository_owner}/{repository_name}/pulls?per_page=100"
+            )
 
         while pull_request_to_add > 0:
             github_api_response = self._make_request(

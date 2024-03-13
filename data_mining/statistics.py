@@ -206,7 +206,9 @@ if __name__ == "__main__":
             )
 
         repository_pull_requests = github_api_client.get_repository_pull_requests_time(
-            repository["owner"], repository["name"]
+            repository["owner"],
+            repository["name"],
+            repository.get("default_branch", ""),
         )
         if repository_pull_requests is not None:
             update_flag = _update_statistics(
