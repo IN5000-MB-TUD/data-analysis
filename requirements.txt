@@ -9,3 +9,5 @@ scikit-learn==1.4.0
 mlforecast==0.11.8
 xgboost==2.0.3
 dtaidistance==2.3.11
+ruptures==1.1.9
+python-dateutil==2.9.0.post0
