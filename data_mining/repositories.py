@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 DATA_PATH = "../data"
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-REPOSITORIES_FILE = "OriginURLMainDatasetSOuPatleast100Cards.csv"
+REPOSITORIES_FILE = "candidates.csv"
 
 if __name__ == "__main__":
     log.info("Start GitHub data mining")
