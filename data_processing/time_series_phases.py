@@ -22,7 +22,6 @@ log = logging.getLogger(__name__)
 
 STATISTICAL_SETTINGS = ComprehensiveFCParameters()
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-PHASES = 5
 
 
 # Utility functions to form groupings
@@ -161,9 +160,13 @@ if __name__ == "__main__":
 
                 phases_time_series = []
                 phase_idx_cumulative = 0
+                timestamp_time_series = []
                 for phase_idx, phase in enumerate(metric_phases):
                     phases_time_series.extend(
                         [phase_idx + 1] * (phase - phase_idx_cumulative)
+                    )
+                    timestamp_time_series.extend(
+                        list(range(0, (phase - phase_idx_cumulative)))
                     )
                     phase_idx_cumulative = phase
 
@@ -173,15 +176,17 @@ if __name__ == "__main__":
                     df_rows.append(
                         (
                             phases_time_series[metric_idx],
-                            metric_tuple[0].timestamp() * 1000,
+                            timestamp_time_series[metric_idx],
                             metric_tuple[1],
                         )
                     )
 
                 df_metric = pd.DataFrame(df_rows, columns=["phase", "time", "value"])
                 df_metric["value"] = (
-                    df_metric["value"] - df_metric["value"].mean()
-                ) / df_metric["value"].std()
+                    df_metric.groupby("phase")["value"]
+                    .apply(lambda v: (v - v.min()) / (v.max() - v.min()))
+                    .reset_index(level=0, drop=True)
+                )
                 df_metric = df_metric.fillna(0)
                 extracted_features = extract_features(
                     df_metric,
@@ -220,11 +225,12 @@ if __name__ == "__main__":
     model_type = "Hierarchical"  # clustering model
 
     # Clustering
+    max_clusters = phases_features["phase_order"].max()
     df_phases = phases_features.drop(columns=["phase_order"])
 
     best_fit = -1
     clusters = 3
-    for n_cluster in range(3, PHASES):
+    for n_cluster in range(3, max_clusters):
         model = ClusterWrapper(
             n_clusters=n_cluster, model_type=model_type, transform_type=transform_type
         )
@@ -248,12 +254,9 @@ if __name__ == "__main__":
     phases_features["phase_order"] = clustered_phases
 
     phases_features = phases_features.groupby(["phase_order"]).mean()
-    # phases_features = (phases_features - phases_features.mean()) / phases_features.std()
 
     # Plot phases curves
-    x = []
-    for i in range(100):
-        x.append(i)
+    x = list(range(0, 13))
 
     for idx, row in phases_features.iterrows():
         poly_coefficients = [
