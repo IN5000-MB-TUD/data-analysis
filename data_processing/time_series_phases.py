@@ -2,6 +2,7 @@ import logging
 from math import ceil
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
 import ruptures as rpt
@@ -248,6 +249,10 @@ if __name__ == "__main__":
         n_clusters=clusters, model_type=model_type, transform_type=transform_type
     )
     model.model.fit(df_phases)
+    joblib.dump(
+        model,
+        f"../models/phases/mts_phases.pickle",
+    )
 
     # Print clustered repos
     clustered_phases = model.fit_predict(df_phases)
@@ -259,6 +264,14 @@ if __name__ == "__main__":
     x = list(range(0, 13))
 
     for idx, row in phases_features.iterrows():
+        # Store phase properties
+        mo.db["evolution_phases"].update_one(
+            {"phase_order": idx},
+            {"$set": row.to_dict()},
+            upsert=True,
+        )
+
+        # Plot phase
         poly_coefficients = [
             row[3],
             row[2],
