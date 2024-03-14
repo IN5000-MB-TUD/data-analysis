@@ -5,10 +5,6 @@ from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
-import ruptures as rpt
-from itertools import groupby
-
-from dateutil.relativedelta import relativedelta
 from matplotlib import pyplot as plt
 from sklearn.metrics import silhouette_score
 from tsfresh import extract_features
@@ -17,66 +13,13 @@ from tsfresh.feature_extraction import ComprehensiveFCParameters
 from connection import mo
 from data_processing.t2f.model.clustering import ClusterWrapper
 from utils.data import get_stargazers_time_series, get_metric_time_series
+from utils.time_series import group_metric_by_month, time_series_phases
 
 # Setup logging
 log = logging.getLogger(__name__)
 
 STATISTICAL_SETTINGS = ComprehensiveFCParameters()
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-
-
-# Utility functions to form groupings
-def group_util(date, min_date):
-    return (date - min_date).days // 31
-
-
-def group_metric_by_month(dates, total_months, min_date):
-    if not dates:
-        return []
-
-    dates_grouped = []
-    dates.sort()
-
-    for key, val in groupby(dates, key=lambda date: group_util(date, min_date)):
-        dates_grouped.append((key, list(val)))
-
-    time_series_cumulative_by_month = []
-    metric_counter = -1
-    dates_grouped_idx = 0
-    grouped_months_count = len(dates_grouped)
-    for month_idx in range(total_months):
-        if (
-            dates_grouped_idx < grouped_months_count
-            and month_idx == dates_grouped[dates_grouped_idx][0]
-        ):
-            metric_counter += len(dates_grouped[dates_grouped_idx][1])
-            dates_grouped_idx += 1
-
-        time_series_cumulative_by_month.append(
-            (min_date + relativedelta(months=month_idx), metric_counter)
-        )
-
-    return time_series_cumulative_by_month
-
-
-def time_series_phases(time_series, show_plot=False):
-    time_series_np = np.array([value for _, value in time_series], dtype="int")
-
-    model = "l2"  # "l1", "rbf", "linear", "normal", "ar"
-    pen = np.log(time_series_np.shape[0]) * 1 * time_series_np.std() ** 2
-
-    algo = rpt.Window(width=min(12, time_series_np.shape[0] - 1), model=model).fit(
-        time_series_np
-    )
-    phases_break_points = algo.predict(pen=pen)
-
-    if show_plot:
-        rpt.show.display(
-            time_series_np, phases_break_points, phases_break_points, figsize=(10, 6)
-        )
-        plt.show()
-
-    return phases_break_points
 
 
 if __name__ == "__main__":
