@@ -201,6 +201,9 @@ if __name__ == "__main__":
     clustered_phases = model.fit_predict(df_phases)
     phases_features["phase_order"] = clustered_phases
 
+    # Store data
+    phases_features.to_csv("../data/time_series_clustering.csv", index=False, columns=["phase_order"])
+
     phases_features = phases_features.groupby(["phase_order"]).mean()
 
     # Plot phases curves
