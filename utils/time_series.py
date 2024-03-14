@@ -1,6 +1,65 @@
 from datetime import timedelta, datetime
+from itertools import groupby
 
+import numpy as np
+import ruptures as rpt
+from dateutil.relativedelta import relativedelta
+from matplotlib import pyplot as plt
 from pytz import utc
+
+
+def group_util(date, min_date):
+    return (date - min_date).days // 31
+
+
+def group_metric_by_month(dates, total_months, min_date):
+    """Group given list of dates by month."""
+    if not dates:
+        return []
+
+    dates_grouped = []
+    dates.sort()
+
+    for key, val in groupby(dates, key=lambda date: group_util(date, min_date)):
+        dates_grouped.append((key, list(val)))
+
+    time_series_cumulative_by_month = []
+    metric_counter = -1
+    dates_grouped_idx = 0
+    grouped_months_count = len(dates_grouped)
+    for month_idx in range(total_months):
+        if (
+            dates_grouped_idx < grouped_months_count
+            and month_idx == dates_grouped[dates_grouped_idx][0]
+        ):
+            metric_counter += len(dates_grouped[dates_grouped_idx][1])
+            dates_grouped_idx += 1
+
+        time_series_cumulative_by_month.append(
+            (min_date + relativedelta(months=month_idx), metric_counter)
+        )
+
+    return time_series_cumulative_by_month
+
+
+def time_series_phases(time_series, show_plot=False):
+    time_series_np = np.array([value for _, value in time_series], dtype="int")
+
+    model = "l2"  # "l1", "rbf", "linear", "normal", "ar"
+    pen = np.log(time_series_np.shape[0]) * 1 * time_series_np.std() ** 2
+
+    algo = rpt.Window(width=min(12, time_series_np.shape[0] - 1), model=model).fit(
+        time_series_np
+    )
+    phases_break_points = algo.predict(pen=pen)
+
+    if show_plot:
+        rpt.show.display(
+            time_series_np, phases_break_points, phases_break_points, figsize=(10, 6)
+        )
+        plt.show()
+
+    return phases_break_points
 
 
 def build_time_series(repository, max_count_key):
