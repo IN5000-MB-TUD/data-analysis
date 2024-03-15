@@ -1,3 +1,4 @@
+import json
 import logging
 from math import ceil
 from pathlib import Path
@@ -27,12 +28,15 @@ if __name__ == "__main__":
 
     # Get the repositories in the database
     repositories = mo.db["repositories_data"].find({"statistics": {"$exists": True}})
+    repository_metrics_phases_count = {}
 
     if not Path("../data/time_series_phases.csv").exists():
         phases_features = pd.DataFrame()
 
         for idx, repository in enumerate(repositories):
             log.info("Analyzing repository {}".format(repository["full_name"]))
+
+            repository_metrics_phases_count[repository["full_name"]] = {}
 
             repository_age_months = ceil(repository["age"] / 2629746)
             repository_age_start = repository["created_at"].replace(
@@ -95,6 +99,10 @@ if __name__ == "__main__":
                 metric_phases_idxs = time_series_phases(metric_by_month)
                 time_series_phases_idxs[metric] = metric_phases_idxs
                 time_series_metrics_by_month[metric] = metric_by_month
+
+                repository_metrics_phases_count[repository["full_name"]][metric] = len(
+                    metric_phases_idxs
+                )
                 log.info(f"{metric} phases: {metric_phases_idxs}")
 
             # Extrapolate metrics time series phases statistical properties
@@ -159,9 +167,13 @@ if __name__ == "__main__":
 
         # Store data
         phases_features.to_csv("../data/time_series_phases.csv", index=False)
+        with open("../data/repository_metrics_phases_count.json", "w") as outfile:
+            json.dump(repository_metrics_phases_count, outfile, indent=4)
     else:
-        # Load data frame
+        # Load data
         phases_features = pd.read_csv("../data/time_series_phases.csv")
+        with open("../data/repository_metrics_phases_count.json") as json_file:
+            repository_metrics_phases_count = json.load(json_file)
 
     log.info("Cluster phases")
 
@@ -201,9 +213,35 @@ if __name__ == "__main__":
     clustered_phases = model.fit_predict(df_phases)
     phases_features["phase_order"] = clustered_phases
 
-    # Store data
-    phases_features.to_csv("../data/time_series_clustering.csv", index=False, columns=["phase_order"])
+    # Store repository phases sequence per metric
+    df_repository_phases_clustering_rows = []
+    phases_rows_counter = 0
+    for (
+        repository_full_name,
+        repository_metrics,
+    ) in repository_metrics_phases_count.items():
+        metrics_phases_sequence = {}
+        for metric, metric_phases_count in repository_metrics.items():
+            for i in range(0, metric_phases_count):
+                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = phases_features[
+                    "phase_order"
+                ][phases_rows_counter]
+            phases_rows_counter += metric_phases_count
+        df_repository_phases_clustering_rows.append(metrics_phases_sequence)
 
+    df_repository_phases_clustering = pd.DataFrame(df_repository_phases_clustering_rows)
+    df_repository_phases_clustering = df_repository_phases_clustering.fillna(2).astype(
+        int
+    )
+    df_repository_phases_clustering["id"] = list(repository_metrics_phases_count.keys())
+    df_repository_phases_clustering = df_repository_phases_clustering.reindex(
+        sorted(df_repository_phases_clustering.columns), axis=1
+    )
+    df_repository_phases_clustering.to_csv(
+        "../data/time_series_clustering.csv", index=False
+    )
+
+    # Store polynomial coefficients
     phases_features = phases_features.groupby(["phase_order"]).mean()
 
     # Plot phases curves
@@ -225,6 +263,10 @@ if __name__ == "__main__":
             row[0],
         ]
         y = np.polyval(poly_coefficients, x)
-        plt.plot(x, y, "-r")
-        plt.title(f"Phase {idx + 1}")
-        plt.show()
+        plt.plot(x, y, label=f"Phase {idx + 1}")
+
+    plt.title(f"Repository Metrics Evolution Phases")
+    plt.xlabel("Time (Months)")
+    plt.ylabel("Metric Value")
+    plt.legend()
+    plt.show()

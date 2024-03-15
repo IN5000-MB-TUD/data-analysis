@@ -54,9 +54,7 @@ if __name__ == "__main__":
         stargazers_by_month = group_metric_by_month(
             stargazers_dates, repository_age_months, repository_age_start
         )
-        time_series_metrics_by_month = {
-            "stargazers": stargazers_by_month
-        }
+        time_series_metrics_by_month = {"stargazers": stargazers_by_month}
         time_series_phases_idxs = {
             "stargazers": time_series_phases(stargazers_by_month)
         }
