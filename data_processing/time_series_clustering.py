@@ -1,5 +1,5 @@
 import logging
-from math import ceil
+from math import ceil, floor
 from pathlib import Path
 
 import joblib
@@ -27,6 +27,15 @@ log = logging.getLogger(__name__)
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 REDUCE_FEATURES = False
+
+
+def proper_round(num, dec=0):
+    num = str(num)[: str(num).index(".") + dec + 2]
+    if num[-1] >= "5":
+        a = num[: -2 - (not dec)]  # integer part
+        b = int(num[-2 - (not dec)]) + 1  # decimal part
+        return float(a) + b ** (-dec + 1) if a and b == 10 else float(a + str(b))
+    return float(num[:-1])
 
 
 if __name__ == "__main__":
@@ -152,7 +161,32 @@ if __name__ == "__main__":
 
     # Print clustered repos
     clustered_repositories = model.fit_predict(df_feats)
-    log.info(clustered_repositories)
+    # df_feats["repository"] = repositories_names
+    df_feats["cluster"] = clustered_repositories
+    df_feats = df_feats[df_feats.columns.drop(list(df_feats.filter(regex="pair_")))]
+    df_feats = df_feats.groupby(["cluster"]).mean()
+
+    cluster_metrics_phases = {}
+    df_feats_columns = list(df_feats.columns)
+    df_feats_columns.sort()
+    for idx, row in df_feats.iterrows():
+        cluster_metrics_phases[f"cluster_{idx}"] = {
+            "stargazers": [],
+            "issues": [],
+            "commits": [],
+            "contributors": [],
+            "deployments": [],
+            "forks": [],
+            "pull": [],
+            "workflows": [],
+        }
+        for metric_phase in df_feats_columns:
+            if metric_phase != "cluster":
+                metric_id = metric_phase.split("_")[1]
+                cluster_metrics_phases[f"cluster_{idx}"][metric_id].append(
+                    int(floor(row[metric_phase]))
+                )
+
     clusters = {}
     for idx, cluster_id in enumerate(clustered_repositories):
         cluster_list = clusters.get(f"Cluster_{cluster_id}", [])
