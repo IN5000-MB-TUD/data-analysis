@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-STATISTICS_EXIST = True
+STATISTICS_EXIST = False
 
 
 def _update_statistics(
