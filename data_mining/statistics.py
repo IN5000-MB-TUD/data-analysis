@@ -104,6 +104,8 @@ if __name__ == "__main__":
                 "commits count",
             )
             repository["commits"] = repository_commits_count
+        else:
+            continue
 
         (
             repository_commits_dates,
