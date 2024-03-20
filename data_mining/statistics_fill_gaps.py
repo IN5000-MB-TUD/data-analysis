@@ -36,9 +36,7 @@ if __name__ == "__main__":
     log.info("Start GitHub statistics retrieval")
 
     # Get the repositories in the database
-    repositories = mo.db["repositories_data"].find(
-        {"statistics": {"$exists": True}}
-    )
+    repositories = mo.db["repositories_data"].find({"statistics": {"$exists": True}})
 
     for repository in repositories:
         log.info(f"Checking repository {repository['full_name']}")

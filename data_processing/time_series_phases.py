@@ -184,30 +184,36 @@ if __name__ == "__main__":
     max_clusters = phases_features["phase_order"].max()
     df_phases = phases_features.drop(columns=["phase_order"])
 
-    best_fit = -1
-    clusters = 3
-    for n_cluster in range(3, max_clusters):
+    # Check if model exists
+    if not Path("../models/phases/mts_phases.pickle").exists():
+        best_fit = -1
+        clusters = 3
+        for n_cluster in range(3, max_clusters):
+            model = ClusterWrapper(
+                n_clusters=n_cluster,
+                model_type=model_type,
+                transform_type=transform_type,
+            )
+            model.model.fit(df_phases)
+            cluster_score = silhouette_score(df_phases, model.model.labels_)
+            if cluster_score > best_fit:
+                best_fit = cluster_score
+                clusters = n_cluster
+        log.info(
+            f"Optimal number of clusters is: {clusters} with silhouette_score: {best_fit}"
+        )
+
+        # Save model
         model = ClusterWrapper(
-            n_clusters=n_cluster, model_type=model_type, transform_type=transform_type
+            n_clusters=clusters, model_type=model_type, transform_type=transform_type
         )
         model.model.fit(df_phases)
-        cluster_score = silhouette_score(df_phases, model.model.labels_)
-        if cluster_score > best_fit:
-            best_fit = cluster_score
-            clusters = n_cluster
-    log.info(
-        f"Optimal number of clusters is: {clusters} with silhouette_score: {best_fit}"
-    )
-
-    # Save model
-    model = ClusterWrapper(
-        n_clusters=clusters, model_type=model_type, transform_type=transform_type
-    )
-    model.model.fit(df_phases)
-    joblib.dump(
-        model,
-        f"../models/phases/mts_phases.pickle",
-    )
+        joblib.dump(
+            model,
+            "../models/phases/mts_phases.pickle",
+        )
+    else:
+        model = joblib.load("../models/phases/mts_phases.pickle")
 
     # Print clustered repos
     clustered_phases = model.fit_predict(df_phases)
@@ -222,23 +228,26 @@ if __name__ == "__main__":
     ) in repository_metrics_phases_count.items():
         metrics_phases_sequence = {}
         for metric, metric_phases_count in repository_metrics.items():
+            phases_average = 0
             for i in range(0, metric_phases_count):
-                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = phases_features[
-                    "phase_order"
-                ][phases_rows_counter]
+                item_value = phases_features["phase_order"][phases_rows_counter + i]
+                phases_average += item_value
+                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = item_value
+
+            # Fill until max phases count with phases mean for the current metric
+            phases_average /= metric_phases_count
+            for i in range(metric_phases_count, max_clusters):
+                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = phases_average
             phases_rows_counter += metric_phases_count
         df_repository_phases_clustering_rows.append(metrics_phases_sequence)
 
     df_repository_phases_clustering = pd.DataFrame(df_repository_phases_clustering_rows)
-    df_repository_phases_clustering = df_repository_phases_clustering.fillna(2).astype(
-        int
-    )
     df_repository_phases_clustering["id"] = list(repository_metrics_phases_count.keys())
     df_repository_phases_clustering = df_repository_phases_clustering.reindex(
         sorted(df_repository_phases_clustering.columns), axis=1
     )
     df_repository_phases_clustering.to_csv(
-        "../data/time_series_clustering.csv", index=False
+        "../data/time_series_clustering_phases.csv", index=False
     )
 
     # Store polynomial coefficients
