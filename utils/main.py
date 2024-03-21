@@ -34,3 +34,13 @@ def normalize(arr, t_min, t_max):
         temp = round((((i - arr_min) * diff) / diff_arr) + t_min, 4)
         norm_arr.append(temp)
     return norm_arr
+
+
+def proper_round(num, dec=0):
+    """Properly round a number to the given decimal point."""
+    num = str(num)[: str(num).index(".") + dec + 2]
+    if num[-1] >= "5":
+        a = num[: -2 - (not dec)]  # integer part
+        b = int(num[-2 - (not dec)]) + 1  # decimal part
+        return float(a) + b ** (-dec + 1) if a and b == 10 else float(a + str(b))
+    return float(num[:-1])
