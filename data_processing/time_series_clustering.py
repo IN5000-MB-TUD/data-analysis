@@ -1,3 +1,4 @@
+import json
 import logging
 from math import ceil
 from pathlib import Path
@@ -189,6 +190,9 @@ if __name__ == "__main__":
                 cluster_metrics_phases[f"cluster_{idx}"][metric_id].append(
                     int(proper_round(row[metric_phase]))
                 )
+
+    with open("../data/cluster_metrics_phases.json", "w") as outfile:
+        json.dump(cluster_metrics_phases, outfile, indent=4)
 
     log.info("-----------------\n")
     log.info(cluster_metrics_phases)
