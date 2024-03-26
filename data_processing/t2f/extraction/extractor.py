@@ -107,7 +107,11 @@ def extract_pair_series_features(mts: list):
     combs = list(itertools.combinations(indexes, r=2))
     for i, j in combs:
         # Extract pair features for each pair in the multivariate time series
-        mts_i, mts_j = merge_time_series(mts[i], mts[j])
+        if len(mts[i]) != len(mts[j]):
+            mts_i, mts_j = merge_time_series(mts[i], mts[j])
+        else:
+            mts_i = mts[i]
+            mts_j = mts[j]
 
         # Convert datetimes to timestamps
         mts_i = [

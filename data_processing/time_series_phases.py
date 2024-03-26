@@ -1,3 +1,4 @@
+import json
 import logging
 from math import ceil
 from pathlib import Path
@@ -27,12 +28,15 @@ if __name__ == "__main__":
 
     # Get the repositories in the database
     repositories = mo.db["repositories_data"].find({"statistics": {"$exists": True}})
+    repository_metrics_phases_count = {}
 
     if not Path("../data/time_series_phases.csv").exists():
         phases_features = pd.DataFrame()
 
         for idx, repository in enumerate(repositories):
             log.info("Analyzing repository {}".format(repository["full_name"]))
+
+            repository_metrics_phases_count[repository["full_name"]] = {}
 
             repository_age_months = ceil(repository["age"] / 2629746)
             repository_age_start = repository["created_at"].replace(
@@ -95,6 +99,10 @@ if __name__ == "__main__":
                 metric_phases_idxs = time_series_phases(metric_by_month)
                 time_series_phases_idxs[metric] = metric_phases_idxs
                 time_series_metrics_by_month[metric] = metric_by_month
+
+                repository_metrics_phases_count[repository["full_name"]][metric] = len(
+                    metric_phases_idxs
+                )
                 log.info(f"{metric} phases: {metric_phases_idxs}")
 
             # Extrapolate metrics time series phases statistical properties
@@ -159,9 +167,13 @@ if __name__ == "__main__":
 
         # Store data
         phases_features.to_csv("../data/time_series_phases.csv", index=False)
+        with open("../data/repository_metrics_phases_count.json", "w") as outfile:
+            json.dump(repository_metrics_phases_count, outfile, indent=4)
     else:
-        # Load data frame
+        # Load data
         phases_features = pd.read_csv("../data/time_series_phases.csv")
+        with open("../data/repository_metrics_phases_count.json") as json_file:
+            repository_metrics_phases_count = json.load(json_file)
 
     log.info("Cluster phases")
 
@@ -172,35 +184,81 @@ if __name__ == "__main__":
     max_clusters = phases_features["phase_order"].max()
     df_phases = phases_features.drop(columns=["phase_order"])
 
-    best_fit = -1
-    clusters = 3
-    for n_cluster in range(3, max_clusters):
+    # Check if model exists
+    if not Path("../models/phases/mts_phases.pickle").exists():
+        best_fit = -1
+        clusters = 3
+        for n_cluster in range(3, max_clusters):
+            model = ClusterWrapper(
+                n_clusters=n_cluster,
+                model_type=model_type,
+                transform_type=transform_type,
+            )
+            model.model.fit(df_phases)
+            cluster_score = silhouette_score(df_phases, model.model.labels_)
+            if cluster_score > best_fit:
+                best_fit = cluster_score
+                clusters = n_cluster
+        log.info(
+            f"Optimal number of clusters is: {clusters} with silhouette_score: {best_fit}"
+        )
+
+        # Save model
         model = ClusterWrapper(
-            n_clusters=n_cluster, model_type=model_type, transform_type=transform_type
+            n_clusters=clusters, model_type=model_type, transform_type=transform_type
         )
         model.model.fit(df_phases)
-        cluster_score = silhouette_score(df_phases, model.model.labels_)
-        if cluster_score > best_fit:
-            best_fit = cluster_score
-            clusters = n_cluster
-    log.info(
-        f"Optimal number of clusters is: {clusters} with silhouette_score: {best_fit}"
-    )
-
-    # Save model
-    model = ClusterWrapper(
-        n_clusters=clusters, model_type=model_type, transform_type=transform_type
-    )
-    model.model.fit(df_phases)
-    joblib.dump(
-        model,
-        f"../models/phases/mts_phases.pickle",
-    )
+        joblib.dump(
+            model,
+            "../models/phases/mts_phases.pickle",
+        )
+    else:
+        model = joblib.load("../models/phases/mts_phases.pickle")
 
     # Print clustered repos
     clustered_phases = model.fit_predict(df_phases)
     phases_features["phase_order"] = clustered_phases
 
+    # Store repository phases sequence per metric
+    df_repository_phases_clustering_rows = []
+    repository_metrics_phases = {}
+    phases_rows_counter = 0
+    for (
+        repository_full_name,
+        repository_metrics,
+    ) in repository_metrics_phases_count.items():
+        metrics_phases_sequence = {}
+        repository_metrics_phases[repository_full_name] = {}
+        for metric, metric_phases_count in repository_metrics.items():
+            repository_metrics_phases[repository_full_name][metric] = []
+            phases_average = 0
+            for i in range(0, metric_phases_count):
+                item_value = phases_features["phase_order"][phases_rows_counter + i]
+                phases_average += item_value
+                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = item_value
+                repository_metrics_phases[repository_full_name][metric].append(
+                    int(item_value)
+                )
+
+                # Fill until max phases count with phases mean for the current metric
+            phases_average /= metric_phases_count
+            for i in range(metric_phases_count, max_clusters):
+                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = phases_average
+            phases_rows_counter += metric_phases_count
+        df_repository_phases_clustering_rows.append(metrics_phases_sequence)
+
+    df_repository_phases_clustering = pd.DataFrame(df_repository_phases_clustering_rows)
+    df_repository_phases_clustering["id"] = list(repository_metrics_phases_count.keys())
+    df_repository_phases_clustering = df_repository_phases_clustering.reindex(
+        sorted(df_repository_phases_clustering.columns), axis=1
+    )
+    df_repository_phases_clustering.to_csv(
+        "../data/time_series_clustering_phases.csv", index=False
+    )
+    with open("../data/repository_metrics_phases.json", "w") as outfile:
+        json.dump(repository_metrics_phases, outfile, indent=4)
+
+    # Store polynomial coefficients
     phases_features = phases_features.groupby(["phase_order"]).mean()
 
     # Plot phases curves
@@ -222,6 +280,10 @@ if __name__ == "__main__":
             row[0],
         ]
         y = np.polyval(poly_coefficients, x)
-        plt.plot(x, y, "-r")
-        plt.title(f"Phase {idx + 1}")
-        plt.show()
+        plt.plot(x, y, label=f"Phase {idx + 1}")
+
+    plt.title(f"Repository Metrics Evolution Phases")
+    plt.xlabel("Time (Months)")
+    plt.ylabel("Metric Value")
+    plt.legend()
+    plt.show()

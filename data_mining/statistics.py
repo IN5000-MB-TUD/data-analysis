@@ -12,7 +12,7 @@ log = logging.getLogger(__name__)
 
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-STATISTICS_EXIST = True
+STATISTICS_EXIST = False
 
 
 def _update_statistics(
@@ -104,6 +104,8 @@ if __name__ == "__main__":
                 "commits count",
             )
             repository["commits"] = repository_commits_count
+        else:
+            continue
 
         (
             repository_commits_dates,
