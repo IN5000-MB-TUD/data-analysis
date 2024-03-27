@@ -3,6 +3,7 @@ from datetime import timedelta
 from math import ceil
 from pathlib import Path
 
+import joblib
 import pandas as pd
 from mlforecast import MLForecast
 from mlforecast.target_transforms import Differences
@@ -14,7 +15,7 @@ from utils.data import (
     get_stargazers_time_series,
     get_metric_time_series,
 )
-from utils.time_series import merge_time_series
+from utils.time_series import group_metric_by_month
 
 # Setup logging
 log = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ log = logging.getLogger(__name__)
 
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 FORECAST_HORIZON_MONTHS = 12
+MINIMUM_AGE_MONTHS = FORECAST_HORIZON_MONTHS * 2
 
 
 if __name__ == "__main__":
@@ -36,122 +38,96 @@ if __name__ == "__main__":
         for idx, repository in enumerate(repositories):
             log.info("Analyzing repository {}".format(repository["full_name"]))
 
-            stargazers_dates, stargazers_cumulative = get_stargazers_time_series(
-                repository
-            )
-            stargazers_time_series = list(zip(stargazers_dates, stargazers_cumulative))
+            repository_age_months = ceil(repository["age"] / 2629746)
+            if repository_age_months < MINIMUM_AGE_MONTHS:
+                log.warning(
+                    "At least {} months of age are needed for the forecasting, excluding {} since it's {} moths old".format(
+                        MINIMUM_AGE_MONTHS,
+                        repository["full_name"],
+                        repository_age_months,
+                    )
+                )
+                continue
 
-            issues_dates, issues_cumulative = get_metric_time_series(
+            repository_age_start = repository["created_at"].replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+
+            stargazers_dates, _ = get_stargazers_time_series(repository)
+            stargazers_time_series = group_metric_by_month(
+                stargazers_dates, repository_age_months, repository_age_start
+            )
+
+            issues_dates, _ = get_metric_time_series(
                 repository, "statistics_issues", "issues", "created_at", "open_issues"
             )
-            issues_time_series = list(zip(issues_dates, issues_cumulative))
+            issues_time_series = group_metric_by_month(
+                issues_dates, repository_age_months, repository_age_start
+            )
 
-            commits_dates, commits_cumulative = get_metric_time_series(
+            commits_dates, _ = get_metric_time_series(
                 repository, "statistics_commits", "commits", "date", "commits"
             )
-            commits_time_series = list(zip(commits_dates, commits_cumulative))
+            commits_time_series = group_metric_by_month(
+                commits_dates, repository_age_months, repository_age_start
+            )
 
-            contributors_dates, contributors_cumulative = get_metric_time_series(
+            contributors_dates, _ = get_metric_time_series(
                 repository, "statistics_commits", "contributors", "first_commit", None
             )
-            contributors_time_series = list(
-                zip(contributors_dates, contributors_cumulative)
+            contributors_time_series = group_metric_by_month(
+                contributors_dates, repository_age_months, repository_age_start
             )
 
-            deployments_dates, deployments_cumulative = get_metric_time_series(
+            deployments_dates, _ = get_metric_time_series(
                 repository, "statistics_deployments", "deployments", "created_at", None
             )
-            deployments_time_series = list(
-                zip(deployments_dates, deployments_cumulative)
+            deployments_time_series = group_metric_by_month(
+                deployments_dates, repository_age_months, repository_age_start
             )
 
-            forks_dates, forks_cumulative = get_metric_time_series(
+            forks_dates, _ = get_metric_time_series(
                 repository, "statistics_forks", "forks", "created_at", "forks_count"
             )
-            forks_time_series = list(zip(forks_dates, forks_cumulative))
+            forks_time_series = group_metric_by_month(
+                forks_dates, repository_age_months, repository_age_start
+            )
 
-            pull_requests_dates, pull_requests_cumulative = get_metric_time_series(
+            pull_requests_dates, _ = get_metric_time_series(
                 repository,
                 "statistics_pull_requests",
                 "pull_requests",
                 "created_at",
                 None,
             )
-            pull_requests_time_series = list(
-                zip(pull_requests_dates, pull_requests_cumulative)
+            pull_requests_time_series = group_metric_by_month(
+                pull_requests_dates, repository_age_months, repository_age_start
             )
 
-            workflows_dates, workflows_cumulative = get_metric_time_series(
+            workflows_dates, _ = get_metric_time_series(
                 repository, "statistics_workflow_runs", "workflows", "created_at", None
             )
-            workflows_time_series = list(zip(workflows_dates, workflows_cumulative))
-
-            # Combine the time series
-            time_series_combination = [
-                stargazers_time_series,
-                issues_time_series,
-                commits_time_series,
-                contributors_time_series,
-                deployments_time_series,
-                forks_time_series,
-                pull_requests_time_series,
-                workflows_time_series,
-            ]
-
-            for i in range(0, len(time_series_combination)):
-                for j in range(i + 1, len(time_series_combination)):
-                    (
-                        time_series_combination[i],
-                        time_series_combination[j],
-                    ) = merge_time_series(
-                        time_series_combination[i], time_series_combination[j]
-                    )
-
-            stargazers_time_series = time_series_combination[0]
-            issues_time_series = time_series_combination[1]
-            commits_time_series = time_series_combination[2]
-            contributors_time_series = time_series_combination[3]
-            deployments_time_series = time_series_combination[4]
-            forks_time_series = time_series_combination[5]
-            pull_requests_time_series = time_series_combination[6]
-            workflows_time_series = time_series_combination[7]
+            workflows_time_series = group_metric_by_month(
+                workflows_dates, repository_age_months, repository_age_start
+            )
 
             # Sample by month
-            repository_age_months = ceil(repository["age"] / 2629746)
-            repository_age_start = stargazers_time_series[0][0].replace(
-                day=1, hour=0, second=0, microsecond=0
-            )
-            time_series_idx_increment = max(
-                1, int(len(stargazers_time_series) / repository_age_months)
-            )
-            time_series_idx = 0
-
             for idx_month in range(0, repository_age_months):
-                repository_age_start += timedelta(days=31)
-                repository_age_start = repository_age_start.replace(
-                    day=1, hour=0, second=0, microsecond=0
-                )
-
                 df_time_series_rows.append(
                     {
-                        "ds": repository_age_start,
+                        "ds": idx_month,
                         "unique_id": repository["full_name"],
                         "repository": idx,
-                        "stargazers": stargazers_time_series[time_series_idx][1],
-                        "issues": issues_time_series[time_series_idx][1],
-                        "commits": commits_time_series[time_series_idx][1],
-                        "contributors": contributors_time_series[time_series_idx][1],
-                        "deployments": deployments_time_series[time_series_idx][1],
-                        "forks": forks_time_series[time_series_idx][1],
-                        "pull_requests": pull_requests_time_series[time_series_idx][1],
-                        "workflows": workflows_time_series[time_series_idx][1],
+                        "stargazers": stargazers_time_series[idx_month][1],
+                        "issues": issues_time_series[idx_month][1],
+                        "commits": commits_time_series[idx_month][1],
+                        "contributors": contributors_time_series[idx_month][1],
+                        "deployments": deployments_time_series[idx_month][1],
+                        "forks": forks_time_series[idx_month][1],
+                        "pull_requests": pull_requests_time_series[idx_month][1],
+                        "workflows": workflows_time_series[idx_month][1],
                     }
                 )
-
-                if time_series_idx < len(stargazers_time_series):
-                    time_series_idx += time_series_idx_increment
-                else:
-                    time_series_idx = -1
 
         # Build data frame
         df_multi_time_series = pd.DataFrame(
@@ -178,6 +154,9 @@ if __name__ == "__main__":
         )
 
     log.info("Dataset loaded, prepare for model training")
+    df_multi_time_series["ds"] = pd.to_numeric(
+        df_multi_time_series["ds"], downcast="integer"
+    )
 
     # Initialize settings
     h = FORECAST_HORIZON_MONTHS
@@ -288,26 +267,42 @@ if __name__ == "__main__":
 
         # Setup the forecasting model
         log.info("Setup model")
-        models = [
-            XGBRegressor(random_state=0, n_estimators=100, device="cuda"),
-        ]
 
-        model = MLForecast(
-            models=models,
-            freq="MS",
-            lags=range(1, 13),
-            target_transforms=[Differences([1, 12])],
-        )
+        # Check if model exists
+        if not Path(
+            f"../models/forecasting/mts_forecast_{feature_target}.pickle"
+        ).exists():
+            models = [
+                XGBRegressor(random_state=0, n_estimators=100, device="cuda"),
+            ]
 
-        # Fit training data to the model
-        log.info("Train model on training set")
-        model.fit(
-            df_training,
-            id_col="unique_id",
-            time_col="ds",
-            target_col="y",
-            static_features=[],
-        )
+            model = MLForecast(
+                models=models,
+                freq=1,
+                lags=range(1, FORECAST_HORIZON_MONTHS + 1),
+                target_transforms=[Differences([1, FORECAST_HORIZON_MONTHS])],
+            )
+
+            # Fit training data to the model
+            log.info("Train model on training set")
+            model.fit(
+                df_training,
+                id_col="unique_id",
+                time_col="ds",
+                target_col="y",
+                static_features=[],
+            )
+
+            # Save the model
+            joblib.dump(
+                model,
+                f"../models/forecasting/mts_forecast_{feature_target}.pickle",
+            )
+        else:
+            # Load the model
+            model = joblib.load(
+                f"../models/forecasting/mts_forecast_{feature_target}.pickle"
+            )
 
         # Predict data
         log.info("Make predictions on validation set")

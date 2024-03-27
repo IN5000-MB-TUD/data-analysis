@@ -21,7 +21,9 @@ def group_metric_by_month(dates, total_months, min_date):
     dates.sort()
 
     for key, val in groupby(dates, key=lambda date: group_util(date, min_date)):
-        dates_grouped.append((key, list(val)))
+        # Keep only months that are >= 0
+        if key >= 0:
+            dates_grouped.append((key, list(val)))
 
     time_series_cumulative_by_month = []
     metric_counter = -1
