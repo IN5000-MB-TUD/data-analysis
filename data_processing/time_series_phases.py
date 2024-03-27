@@ -23,6 +23,62 @@ STATISTICAL_SETTINGS = ComprehensiveFCParameters()
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
+def extrapolate_phases_properties(metric_phases, metric_by_month):
+    """
+    Extrapolate the given metric phases statistical properties.
+
+    :param metric_phases: The metric phases indexes.
+    :param metric_by_month: The metric values by month time series.
+    :return: The dataframe of the extracted features for the metric.
+    """
+    phases_time_series = []
+    phase_idx_cumulative = 0
+    timestamp_time_series = []
+    for phase_idx, phase in enumerate(metric_phases):
+        phases_time_series.extend([phase_idx + 1] * (phase - phase_idx_cumulative))
+        timestamp_time_series.extend(list(range(0, (phase - phase_idx_cumulative))))
+        phase_idx_cumulative = phase
+
+    # Build data frame
+    df_rows = []
+    for metric_idx, metric_data in enumerate(metric_by_month):
+        if isinstance(metric_data, tuple):
+            metric_value = metric_data[1]
+        else:
+            metric_value = metric_data
+
+        df_rows.append(
+            (
+                phases_time_series[metric_idx],
+                timestamp_time_series[metric_idx],
+                metric_value,
+            )
+        )
+
+    df_metric = pd.DataFrame(df_rows, columns=["phase", "time", "value"])
+    df_metric["value"] = (
+        df_metric.groupby("phase")["value"]
+        .apply(lambda v: (v - v.min()) / (v.max() - v.min()))
+        .reset_index(level=0, drop=True)
+    )
+    df_metric = df_metric.fillna(0)
+    extracted_features = extract_features(
+        df_metric,
+        column_id="phase",
+        column_sort="time",
+        default_fc_parameters={
+            "friedrich_coefficients": STATISTICAL_SETTINGS["friedrich_coefficients"],
+            "standard_deviation": STATISTICAL_SETTINGS["standard_deviation"],
+            "skewness": STATISTICAL_SETTINGS["skewness"],
+            "autocorrelation": STATISTICAL_SETTINGS["autocorrelation"],
+        },
+    )
+    extracted_features = extracted_features.fillna(0)
+    extracted_features = extracted_features.rename_axis("phase_order").reset_index()
+
+    return extracted_features
+
+
 if __name__ == "__main__":
     log.info("Start GitHub statistics retrieval from Database")
 
@@ -110,55 +166,10 @@ if __name__ == "__main__":
                 metric_phases = time_series_phases_idxs[metric]
                 metric_by_month = time_series_metrics_by_month[metric]
 
-                phases_time_series = []
-                phase_idx_cumulative = 0
-                timestamp_time_series = []
-                for phase_idx, phase in enumerate(metric_phases):
-                    phases_time_series.extend(
-                        [phase_idx + 1] * (phase - phase_idx_cumulative)
-                    )
-                    timestamp_time_series.extend(
-                        list(range(0, (phase - phase_idx_cumulative)))
-                    )
-                    phase_idx_cumulative = phase
-
-                # Build data frame
-                df_rows = []
-                for metric_idx, metric_tuple in enumerate(metric_by_month):
-                    df_rows.append(
-                        (
-                            phases_time_series[metric_idx],
-                            timestamp_time_series[metric_idx],
-                            metric_tuple[1],
-                        )
-                    )
-
-                df_metric = pd.DataFrame(df_rows, columns=["phase", "time", "value"])
-                df_metric["value"] = (
-                    df_metric.groupby("phase")["value"]
-                    .apply(lambda v: (v - v.min()) / (v.max() - v.min()))
-                    .reset_index(level=0, drop=True)
+                extracted_features = extrapolate_phases_properties(
+                    metric_phases, metric_by_month
                 )
-                df_metric = df_metric.fillna(0)
-                extracted_features = extract_features(
-                    df_metric,
-                    column_id="phase",
-                    column_sort="time",
-                    default_fc_parameters={
-                        "friedrich_coefficients": STATISTICAL_SETTINGS[
-                            "friedrich_coefficients"
-                        ],
-                        "standard_deviation": STATISTICAL_SETTINGS[
-                            "standard_deviation"
-                        ],
-                        "skewness": STATISTICAL_SETTINGS["skewness"],
-                        "autocorrelation": STATISTICAL_SETTINGS["autocorrelation"],
-                    },
-                )
-                extracted_features = extracted_features.fillna(0)
-                extracted_features = extracted_features.rename_axis(
-                    "phase_order"
-                ).reset_index()
+
                 phases_features = pd.concat(
                     [phases_features, extracted_features], ignore_index=True
                 )

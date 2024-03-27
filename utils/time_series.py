@@ -45,7 +45,14 @@ def group_metric_by_month(dates, total_months, min_date):
 
 
 def time_series_phases(time_series, show_plot=False):
-    time_series_np = np.array([value for _, value in time_series], dtype="int")
+    if not time_series:
+        return []
+
+    # Check if list is made of tuples or integers
+    if isinstance(time_series[0], tuple):
+        time_series_np = np.array([value for _, value in time_series], dtype="int")
+    else:
+        time_series_np = np.array(time_series, dtype="int")
 
     model = "l2"  # "l1", "rbf", "linear", "normal", "ar"
     pen = np.log(time_series_np.shape[0]) * 1 * time_series_np.std() ** 2
