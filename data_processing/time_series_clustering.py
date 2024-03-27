@@ -145,9 +145,7 @@ if __name__ == "__main__":
     log.info(f"Optimal number of clusters is: {clusters}\n")
 
     # Check if model exists
-    if not Path(
-        f"../models/clustering/mts_clustering_{len(repositories_names)}_repos.pickle"
-    ).exists():
+    if not Path(f"../models/clustering/mts_clustering.pickle").exists():
         # Save model
         model = ClusterWrapper(
             n_clusters=clusters, model_type=model_type, transform_type=transform_type
@@ -155,13 +153,11 @@ if __name__ == "__main__":
         model.model.fit(df_feats)
         joblib.dump(
             model,
-            f"../models/clustering/mts_clustering_{len(repositories_names)}_repos.pickle",
+            f"../models/clustering/mts_clustering.pickle",
         )
     else:
         # Load existing model
-        model = joblib.load(
-            f"../models/clustering/mts_clustering_{len(repositories_names)}_repos.pickle"
-        )
+        model = joblib.load(f"../models/clustering/mts_clustering.pickle")
 
     # Print clustered repos
     clustered_repositories = model.fit_predict(df_feats)
