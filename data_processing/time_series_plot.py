@@ -47,9 +47,8 @@ def create_plot(
     if save_plot:
         # Saving the resulting plot to a file
         plt.savefig(path)
-    else:
-        # Show the plot
-        plt.show()
+
+    return plt
 
 
 if __name__ == "__main__":
