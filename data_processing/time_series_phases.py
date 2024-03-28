@@ -14,6 +14,7 @@ from tsfresh.feature_extraction import ComprehensiveFCParameters
 from connection import mo
 from data_processing.t2f.model.clustering import ClusterWrapper
 from utils.data import get_stargazers_time_series, get_metric_time_series
+from utils.models import train_knn_classifier
 from utils.time_series import group_metric_by_month, time_series_phases
 
 # Setup logging
@@ -274,8 +275,14 @@ if __name__ == "__main__":
     else:
         model = joblib.load("../models/phases/mts_phases.pickle")
 
-    # Print clustered repos
+    # Cluster repos
     clustered_phases = model.fit_predict(df_phases)
+
+    # Save classifier model
+    train_knn_classifier(
+        df_phases, clustered_phases, "../models/phases/mts_phases_classifier.pickle"
+    )
+
     phases_features["phase_order"] = clustered_phases
 
     # Store repository phases sequence per metric
