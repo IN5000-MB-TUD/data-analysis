@@ -117,16 +117,16 @@ if __name__ == "__main__":
         }
 
     # Plot metrics curves
-    # for metric, metric_data in metrics_time_series.items():
-    #     log.info(f"Plotting metric {metric} curve")
-    #     create_plot(
-    #         "{} {}".format(metric, repository_db_record["full_name"]),
-    #         "Total: {}".format(metric_data["values"][-1]),
-    #         "Date",
-    #         "Count",
-    #         metric_data["dates"],
-    #         [metric_data["values"]],
-    #     )
+    for metric, metric_data in metrics_time_series.items():
+        log.info(f"Plotting metric {metric} curve")
+        create_plot(
+            "{} {}".format(metric, repository_db_record["full_name"]),
+            "Total: {}".format(metric_data["values"][-1]),
+            "Date",
+            "Count",
+            metric_data["dates"],
+            [metric_data["values"]],
+        )
 
     log.info("---------------------------------------------------\n")
 
@@ -158,15 +158,17 @@ if __name__ == "__main__":
 
     log.info("Clustering the metrics phases...")
     df_phases = phases_features.drop(columns=["phase_order"])
-    if not Path("../models/phases/mts_phases.pickle").exists():
+    if not Path("../models/phases/mts_phases_classifier.pickle").exists():
         log.warning(
-            "The phases clustering model does not exists in the /models/phases folder. "
+            "The phases clustering classifier model does not exists in the /models/phases folder. "
             "Run the data_processing/time_series_phases.py script to create it."
         )
         exit()
-    phases_clustering_model = joblib.load("../models/phases/mts_phases.pickle")
+    phases_clustering_model = joblib.load(
+        "../models/phases/mts_phases_classifier.pickle"
+    )
 
-    clustered_phases = phases_clustering_model.fit_predict(df_phases)
+    clustered_phases = phases_clustering_model.predict(df_phases)
     phases_features["phase_cluster"] = clustered_phases
 
     log.info("Building metrics phases sequences...")
@@ -227,15 +229,17 @@ if __name__ == "__main__":
 
     log.info("Cluster the repository...")
     df_feats = pd.concat([df_repository_phases_clustering, ts_features_df], axis=1)
-    if not Path(f"../models/clustering/mts_clustering.pickle").exists():
+    if not Path(f"../models/clustering/mts_clustering_classifier.pickle").exists():
         log.warning(
-            "The repositories clustering model does not exists in the /models/clustering folder."
+            "The repositories clustering classifier model does not exists in the /models/clustering folder."
             "Run the data_processing/time_series_clustering.py script to create it."
         )
         exit()
-    repos_clustering_model = joblib.load("../models/clustering/mts_clustering.pickle")
+    repos_clustering_model = joblib.load(
+        "../models/clustering/mts_clustering_classifier.pickle"
+    )
 
-    clustered_repository = repos_clustering_model.fit_predict(df_feats)
+    clustered_repository = repos_clustering_model.predict(df_feats)
     log.info(f"The repository was assigned to cluster {clustered_repository}")
 
     log.info("---------------------------------------------------\n")
