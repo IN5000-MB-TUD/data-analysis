@@ -1,7 +1,10 @@
-# data-analysis
+# Repositories Data Analysis
+
 IN5000 TU Delft - MSc Computer Science - Data Analysis
 
 ## Requirements
+
+Python Version must be >= 3.10.
 
 Run in the terminal:
 
@@ -35,19 +38,6 @@ The data mining uses the GitHub API to gather repositories data. The version use
 
 https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28
 
-Release
-
-https://docs.github.com/en/rest/commits/commits?apiVersion=2022-11-28
-https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28
-https://docs.github.com/en/rest/branches/branches?apiVersion=2022-11-28
-https://docs.github.com/en/rest/projects/cards?apiVersion=2022-11-28
-
-Code & Community
-
-https://docs.github.com/en/rest/dependency-graph/sboms?apiVersion=2022-11-28
-https://docs.github.com/en/rest/metrics/statistics?apiVersion=2022-11-28
-https://docs.github.com/en/rest/metrics/traffic?apiVersion=2022-11-28
-
 Move to the `data_mining` folder and run:
 
 ```shell
@@ -58,26 +48,62 @@ cd data_mining
 python repositories.py
 
 # Run GitHub statistics gathering
-# Might need to be re-run since the GitHub API needs time to gather the values
 python statistics.py
+
+# In case of missing statistics, fill the gaps with zeros
+python statistics_fill_gaps.py
 ```
 
 ### Data Processing
 
-Move to the `data_processing` folder and run:
+Move to the `data_processing` folder and run the following scripts:
+
+#### Phases Clustering
 
 ```shell
 # Move to the data_processing folder
 cd data_processing
 
-# Generate Plots for statistics
-python time_series_plot.py
+# Create the phases clustering model (saved in the models/phases folder)
+python time_series_phases.py
 
-# Cluster repositories
+# Gather the occurrence probabilities of each phase (stored in the database)
+python time_series_phase_probability.py
+```
+
+#### Repositories Clustering
+
+```shell
+# Move to the data_processing folder
+cd data_processing
+
+# Cluster repositories based on their metrics phases and metrics patterns similarity
+# The clustering model is saved in the models/clustering folder
 python time_series_clustering.py
 
-# Forecast time series
+# Plot the average metrics curves for each cluster
+python time_series_clustering_plot.py
+```
+
+#### Multi-Variate Time Series Forecasting
+
+```shell
+# Move to the data_processing folder
+cd data_processing
+
+# Create the forecasting models for each metric
+# The forecasting models are saved in the models/forecasting folder
 python time_series_forecasting.py
+```
+
+#### Plot Curves
+
+```shell
+# Move to the data_processing folder
+cd data_processing
+
+# Plot the repositories metrics time series curves
+python time_series_plot.py
 ```
 
 ## Code Formatting
@@ -91,3 +117,12 @@ black --check ./
 # Format files
 black ./
 ```
+
+## Contributors
+
+Project developed for the course IN5000 - Master's thesis of the 2023/2024 academic year at TU Delft.
+
+Author:
+- Mattia Bonfanti
+- [m.bonfanti@student.tudelft.nl](mailto:m.bonfanti@student.tudelft.nl)
+- Master's in Computer Science - Software Technology Track

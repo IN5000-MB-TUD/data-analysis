@@ -14,6 +14,7 @@ from tsfresh.feature_extraction import ComprehensiveFCParameters
 from connection import mo
 from data_processing.t2f.model.clustering import ClusterWrapper
 from utils.data import get_stargazers_time_series, get_metric_time_series
+from utils.models import train_knn_classifier
 from utils.time_series import group_metric_by_month, time_series_phases
 
 # Setup logging
@@ -21,6 +22,110 @@ log = logging.getLogger(__name__)
 
 STATISTICAL_SETTINGS = ComprehensiveFCParameters()
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+
+def extrapolate_phases_properties(metric_phases, metric_by_month):
+    """
+    Extrapolate the given metric phases statistical properties.
+
+    :param metric_phases: The metric phases indexes.
+    :param metric_by_month: The metric values by month time series.
+    :return: The dataframe of the extracted features for the metric.
+    """
+    phases_time_series = []
+    phase_idx_cumulative = 0
+    timestamp_time_series = []
+    for phase_idx, phase in enumerate(metric_phases):
+        phases_time_series.extend([phase_idx + 1] * (phase - phase_idx_cumulative))
+        timestamp_time_series.extend(list(range(0, (phase - phase_idx_cumulative))))
+        phase_idx_cumulative = phase
+
+    # Build data frame
+    df_rows = []
+    for metric_idx, metric_data in enumerate(metric_by_month):
+        if isinstance(metric_data, tuple):
+            metric_value = metric_data[1]
+        else:
+            metric_value = metric_data
+
+        df_rows.append(
+            (
+                phases_time_series[metric_idx],
+                timestamp_time_series[metric_idx],
+                metric_value,
+            )
+        )
+
+    df_metric = pd.DataFrame(df_rows, columns=["phase", "time", "value"])
+    df_metric["value"] = (
+        df_metric.groupby("phase")["value"]
+        .apply(lambda v: (v - v.min()) / (v.max() - v.min()))
+        .reset_index(level=0, drop=True)
+    )
+    df_metric = df_metric.fillna(0)
+    extracted_features = extract_features(
+        df_metric,
+        column_id="phase",
+        column_sort="time",
+        default_fc_parameters={
+            "friedrich_coefficients": STATISTICAL_SETTINGS["friedrich_coefficients"],
+            "standard_deviation": STATISTICAL_SETTINGS["standard_deviation"],
+            "skewness": STATISTICAL_SETTINGS["skewness"],
+            "autocorrelation": STATISTICAL_SETTINGS["autocorrelation"],
+        },
+    )
+    extracted_features = extracted_features.fillna(0)
+    extracted_features = extracted_features.rename_axis("phase_order").reset_index()
+
+    return extracted_features
+
+
+def _prepare_repository_clustering_phases_files(
+    repository_metrics_phases_count, phases_features
+):
+    """
+    Prepare files for the clustering script.
+
+    :param repository_metrics_phases_count: The phases count for each repository metric.
+    :param phases_features: The phases feature dataframe.
+    """
+    df_repository_phases_clustering_rows = []
+    repository_metrics_phases = {}
+    phases_rows_counter = 0
+    for (
+        repository_full_name,
+        repository_metrics,
+    ) in repository_metrics_phases_count.items():
+        metrics_phases_sequence = {}
+        repository_metrics_phases[repository_full_name] = {}
+        for metric, metric_phases_count in repository_metrics.items():
+            repository_metrics_phases[repository_full_name][metric] = []
+            phases_average = 0
+            for i in range(0, metric_phases_count):
+                item_value = phases_features["phase_order"][phases_rows_counter + i]
+                phases_average += item_value
+                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = item_value
+                repository_metrics_phases[repository_full_name][metric].append(
+                    int(item_value)
+                )
+
+                # Fill until max phases count with phases mean for the current metric
+            phases_average /= metric_phases_count
+            for i in range(metric_phases_count, max_clusters):
+                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = phases_average
+            phases_rows_counter += metric_phases_count
+        df_repository_phases_clustering_rows.append(metrics_phases_sequence)
+
+    df_repository_phases_clustering = pd.DataFrame(df_repository_phases_clustering_rows)
+    df_repository_phases_clustering["id"] = list(repository_metrics_phases_count.keys())
+    df_repository_phases_clustering = df_repository_phases_clustering.reindex(
+        sorted(df_repository_phases_clustering.columns), axis=1
+    )
+    df_repository_phases_clustering.to_csv(
+        "../data/time_series_clustering_phases.csv", index=False
+    )
+    with open("../data/repository_metrics_phases.json", "w") as outfile:
+        json.dump(repository_metrics_phases, outfile, indent=4)
 
 
 if __name__ == "__main__":
@@ -110,55 +215,10 @@ if __name__ == "__main__":
                 metric_phases = time_series_phases_idxs[metric]
                 metric_by_month = time_series_metrics_by_month[metric]
 
-                phases_time_series = []
-                phase_idx_cumulative = 0
-                timestamp_time_series = []
-                for phase_idx, phase in enumerate(metric_phases):
-                    phases_time_series.extend(
-                        [phase_idx + 1] * (phase - phase_idx_cumulative)
-                    )
-                    timestamp_time_series.extend(
-                        list(range(0, (phase - phase_idx_cumulative)))
-                    )
-                    phase_idx_cumulative = phase
-
-                # Build data frame
-                df_rows = []
-                for metric_idx, metric_tuple in enumerate(metric_by_month):
-                    df_rows.append(
-                        (
-                            phases_time_series[metric_idx],
-                            timestamp_time_series[metric_idx],
-                            metric_tuple[1],
-                        )
-                    )
-
-                df_metric = pd.DataFrame(df_rows, columns=["phase", "time", "value"])
-                df_metric["value"] = (
-                    df_metric.groupby("phase")["value"]
-                    .apply(lambda v: (v - v.min()) / (v.max() - v.min()))
-                    .reset_index(level=0, drop=True)
+                extracted_features = extrapolate_phases_properties(
+                    metric_phases, metric_by_month
                 )
-                df_metric = df_metric.fillna(0)
-                extracted_features = extract_features(
-                    df_metric,
-                    column_id="phase",
-                    column_sort="time",
-                    default_fc_parameters={
-                        "friedrich_coefficients": STATISTICAL_SETTINGS[
-                            "friedrich_coefficients"
-                        ],
-                        "standard_deviation": STATISTICAL_SETTINGS[
-                            "standard_deviation"
-                        ],
-                        "skewness": STATISTICAL_SETTINGS["skewness"],
-                        "autocorrelation": STATISTICAL_SETTINGS["autocorrelation"],
-                    },
-                )
-                extracted_features = extracted_features.fillna(0)
-                extracted_features = extracted_features.rename_axis(
-                    "phase_order"
-                ).reset_index()
+
                 phases_features = pd.concat(
                     [phases_features, extracted_features], ignore_index=True
                 )
@@ -215,48 +275,20 @@ if __name__ == "__main__":
     else:
         model = joblib.load("../models/phases/mts_phases.pickle")
 
-    # Print clustered repos
+    # Cluster repos
     clustered_phases = model.fit_predict(df_phases)
+
+    # Save classifier model
+    train_knn_classifier(
+        df_phases, clustered_phases, "../models/phases/mts_phases_classifier.pickle"
+    )
+
     phases_features["phase_order"] = clustered_phases
 
     # Store repository phases sequence per metric
-    df_repository_phases_clustering_rows = []
-    repository_metrics_phases = {}
-    phases_rows_counter = 0
-    for (
-        repository_full_name,
-        repository_metrics,
-    ) in repository_metrics_phases_count.items():
-        metrics_phases_sequence = {}
-        repository_metrics_phases[repository_full_name] = {}
-        for metric, metric_phases_count in repository_metrics.items():
-            repository_metrics_phases[repository_full_name][metric] = []
-            phases_average = 0
-            for i in range(0, metric_phases_count):
-                item_value = phases_features["phase_order"][phases_rows_counter + i]
-                phases_average += item_value
-                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = item_value
-                repository_metrics_phases[repository_full_name][metric].append(
-                    int(item_value)
-                )
-
-                # Fill until max phases count with phases mean for the current metric
-            phases_average /= metric_phases_count
-            for i in range(metric_phases_count, max_clusters):
-                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = phases_average
-            phases_rows_counter += metric_phases_count
-        df_repository_phases_clustering_rows.append(metrics_phases_sequence)
-
-    df_repository_phases_clustering = pd.DataFrame(df_repository_phases_clustering_rows)
-    df_repository_phases_clustering["id"] = list(repository_metrics_phases_count.keys())
-    df_repository_phases_clustering = df_repository_phases_clustering.reindex(
-        sorted(df_repository_phases_clustering.columns), axis=1
+    _prepare_repository_clustering_phases_files(
+        repository_metrics_phases_count, phases_features
     )
-    df_repository_phases_clustering.to_csv(
-        "../data/time_series_clustering_phases.csv", index=False
-    )
-    with open("../data/repository_metrics_phases.json", "w") as outfile:
-        json.dump(repository_metrics_phases, outfile, indent=4)
 
     # Store polynomial coefficients
     phases_features = phases_features.groupby(["phase_order"]).mean()

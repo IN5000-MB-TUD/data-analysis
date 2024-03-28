@@ -17,6 +17,7 @@ from utils.data import (
     get_metrics_information,
 )
 from utils.main import normalize, proper_round
+from utils.models import train_knn_classifier
 from utils.time_series import group_metric_by_month
 
 # Setup logging
@@ -145,9 +146,7 @@ if __name__ == "__main__":
     log.info(f"Optimal number of clusters is: {clusters}\n")
 
     # Check if model exists
-    if not Path(
-        f"../models/clustering/mts_clustering_{len(repositories_names)}_repos.pickle"
-    ).exists():
+    if not Path(f"../models/clustering/mts_clustering.pickle").exists():
         # Save model
         model = ClusterWrapper(
             n_clusters=clusters, model_type=model_type, transform_type=transform_type
@@ -155,17 +154,23 @@ if __name__ == "__main__":
         model.model.fit(df_feats)
         joblib.dump(
             model,
-            f"../models/clustering/mts_clustering_{len(repositories_names)}_repos.pickle",
+            f"../models/clustering/mts_clustering.pickle",
         )
     else:
         # Load existing model
-        model = joblib.load(
-            f"../models/clustering/mts_clustering_{len(repositories_names)}_repos.pickle"
-        )
+        model = joblib.load(f"../models/clustering/mts_clustering.pickle")
 
-    # Print clustered repos
+    # Cluster repos
     clustered_repositories = model.fit_predict(df_feats)
-    # df_feats["repository"] = repositories_names
+
+    # Train and save classifier model
+    train_knn_classifier(
+        df_feats,
+        clustered_repositories,
+        "../models/clustering/mts_clustering_classifier.pickle",
+    )
+
+    # Print clustered repositories
     df_feats["cluster"] = clustered_repositories
     df_feats = df_feats[df_feats.columns.drop(list(df_feats.filter(regex="pair_")))]
     df_feats = df_feats.groupby(["cluster"]).mean()

@@ -16,7 +16,9 @@ log = logging.getLogger(__name__)
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
-def _create_plot(path, title, subtitle, xlabel, ylabel, x, y, labels=None):
+def create_plot(
+    title, subtitle, xlabel, ylabel, x, y, path="", save_plot=False, labels=None
+):
     """Create plot and save it as PNG"""
     # Adjusting the figure size
     plt.subplots(figsize=(16, 8))
@@ -42,8 +44,12 @@ def _create_plot(path, title, subtitle, xlabel, ylabel, x, y, labels=None):
     # Rotating axis ticks and customizing their font size
     plt.xticks(rotation=30, fontsize=15)
 
-    # Saving the resulting plot to a file
-    plt.savefig(path)
+    if save_plot:
+        # Saving the resulting plot to a file
+        plt.savefig(path)
+    else:
+        # Show the plot
+        plt.show()
 
 
 if __name__ == "__main__":
@@ -58,16 +64,17 @@ if __name__ == "__main__":
         # Plot metrics
         stargazers, stargazers_cumulative = get_stargazers_time_series(repository)
 
-        _create_plot(
-            "../plots/stargazers/{}_{}_{}.png".format(
-                idx, repository["owner"], repository["name"]
-            ),
+        create_plot(
             "Stargazers {}".format(repository["full_name"]),
             "Total: {}".format(repository["stargazers_count"]),
             "Date",
             "Count",
             stargazers,
             [stargazers_cumulative],
+            "../plots/stargazers/{}_{}_{}.png".format(
+                idx, repository["owner"], repository["name"]
+            ),
+            True,
         )
 
         for metric in get_metrics_information():
@@ -82,16 +89,17 @@ if __name__ == "__main__":
             if len(metric_cumulative) == 0:
                 continue
 
-            _create_plot(
-                "../plots/{}/{}_{}_{}.png".format(
-                    metric[1], idx, repository["owner"], repository["name"]
-                ),
+            create_plot(
                 "{} {}".format(metric[1], repository["full_name"]),
                 "Total: {}".format(metric_cumulative[-1]),
                 "Date",
                 "Count",
                 metric_dates,
                 [metric_cumulative],
+                "../plots/{}/{}_{}_{}.png".format(
+                    metric[1], idx, repository["owner"], repository["name"]
+                ),
+                True,
             )
 
         log.info("------------------------")

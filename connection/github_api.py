@@ -19,7 +19,7 @@ class GitHubAPI:
     def __init__(self):
         """Initialize GitHubAPI class"""
         self.github_api_url = "https://api.github.com/repos/"
-        self.github_auth_token = os.getenv("GITHUB_AUTH_TOKEN")
+        self.github_auth_token = os.getenv("GITHUB_AUTH_TOKEN", "")
         self.github_api_version = "2022-11-28"
         self.headers = {
             "Authorization": "Bearer " + self.github_auth_token,
