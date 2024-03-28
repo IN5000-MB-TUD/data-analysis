@@ -4,12 +4,14 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
+from utilsforecast.plotting import plot_series
 
 from connection import mo
 from data_mining.repositories import update_github_repository_data
 from data_mining.statistics import update_repository_statistics_data
 from data_mining.statistics_fill_gaps import fill_repository_statistics_gaps
 from data_processing.t2f.extraction.extractor import extract_pair_series_features
+from data_processing.time_series_forecasting import TRAINING_SETTINGS
 from data_processing.time_series_phases import extrapolate_phases_properties
 from data_processing.time_series_plot import create_plot
 from utils.data import (
@@ -117,16 +119,16 @@ if __name__ == "__main__":
         }
 
     # Plot metrics curves
-    # for metric, metric_data in metrics_time_series.items():
-    #     log.info(f"Plotting metric {metric} curve")
-    #     create_plot(
-    #         "{} {}".format(metric, repository_db_record["full_name"]),
-    #         "Total: {}".format(metric_data["values"][-1]),
-    #         "Date",
-    #         "Count",
-    #         metric_data["dates"],
-    #         [metric_data["values"]],
-    #     )
+    for metric, metric_data in metrics_time_series.items():
+        log.info(f"Plotting metric {metric} curve")
+        create_plot(
+            "{} {}".format(metric, repository_db_record["full_name"]),
+            "Total: {}".format(metric_data["values"][-1]),
+            "Date",
+            "Count",
+            metric_data["dates"],
+            [metric_data["values"]],
+        )
 
     log.info("---------------------------------------------------\n")
 
@@ -140,7 +142,7 @@ if __name__ == "__main__":
         metrics_phases[metric] = {
             "phases": metric_phases_idxs,
             "phases_count": len(metric_phases_idxs),
-            "phases_dates": [metric_data["dates"][i - 1] for i in metric_phases_idxs]
+            "phases_dates": [metric_data["dates"][i - 1] for i in metric_phases_idxs],
         }
 
     log.info("Extrapolating metrics time series phases statistical properties...")
@@ -247,5 +249,72 @@ if __name__ == "__main__":
 
     # STEP 5: METRICS FORECASTING
     log.info("STEP 5: METRICS FORECASTING")
+
+    # Build data frame
+    log.info("Building the metrics time series dataframe...")
+    df_multi_time_series = pd.DataFrame(
+        columns=[
+            "ds",
+            "unique_id",
+            "stargazers",
+            "issues",
+            "commits",
+            "contributors",
+            "deployments",
+            "forks",
+            "pull_requests",
+            "workflows",
+        ],
+    )
+
+    df_multi_time_series["ds"] = list(range(repository_age_months))
+    df_multi_time_series["unique_id"] = [REPOSITORY_FULL_NAME] * repository_age_months
+    for metric, metric_data in metrics_time_series.items():
+        df_multi_time_series[metric] = metric_data["values"]
+
+    # Set the months to forecast
+    forecast_horizon = 12
+
+    for feature_target, dynamic_features in TRAINING_SETTINGS.items():
+        # Check if model exists
+        if not Path(
+            f"../models/forecasting/mts_forecast_{feature_target}.pickle"
+        ).exists():
+            log.warning(
+                f"The {feature_target} forecasting model not exists in the /models/forecasting folder."
+                "Run the data_processing/time_series_forecasting.py script to create it."
+            )
+            continue
+
+        log.info(f"Forecasting for {feature_target} metric...")
+
+        # Load the model
+        forecasting_model = joblib.load(
+            f"../models/forecasting/mts_forecast_{feature_target}.pickle"
+        )
+
+        # Build the data frames
+        df_time_series = df_multi_time_series.rename(columns={feature_target: "y"})
+        df_predict = (
+            df_time_series.head(-forecast_horizon)
+            .reset_index(drop=True)
+            .set_index(dynamic_features, append=True)
+        )
+        df_validate = (
+            df_time_series.tail(forecast_horizon)
+            .reset_index(drop=True)
+            .set_index(dynamic_features, append=True)
+        )
+
+        df_forecast = forecasting_model.predict(
+            h=forecast_horizon,
+            new_df=df_predict,
+        ).merge(
+            df_validate[["unique_id", "ds", "y"]], on=["unique_id", "ds"], how="left"
+        )
+
+        # Plot time frames
+        fig = plot_series(df_predict, df_forecast)
+        fig.show()
 
     log.info("---------------------------------------------------\n")

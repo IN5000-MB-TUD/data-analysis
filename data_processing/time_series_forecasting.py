@@ -24,6 +24,80 @@ log = logging.getLogger(__name__)
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 FORECAST_HORIZON_MONTHS = 12
 MINIMUM_AGE_MONTHS = FORECAST_HORIZON_MONTHS * 2
+TRAINING_SETTINGS = {
+    "stargazers": [
+        "issues",
+        "commits",
+        "contributors",
+        "deployments",
+        "forks",
+        "pull_requests",
+        "workflows",
+    ],
+    "issues": [
+        "stargazers",
+        "commits",
+        "contributors",
+        "deployments",
+        "forks",
+        "pull_requests",
+        "workflows",
+    ],
+    "commits": [
+        "stargazers",
+        "issues",
+        "contributors",
+        "deployments",
+        "forks",
+        "pull_requests",
+        "workflows",
+    ],
+    "contributors": [
+        "stargazers",
+        "issues",
+        "commits",
+        "deployments",
+        "forks",
+        "pull_requests",
+        "workflows",
+    ],
+    "deployments": [
+        "stargazers",
+        "issues",
+        "commits",
+        "contributors",
+        "forks",
+        "pull_requests",
+        "workflows",
+    ],
+    "forks": [
+        "stargazers",
+        "issues",
+        "commits",
+        "contributors",
+        "deployments",
+        "pull_requests",
+        "workflows",
+    ],
+    "pull_requests": [
+        "stargazers",
+        "issues",
+        "commits",
+        "contributors",
+        "deployments",
+        "forks",
+        "workflows",
+    ],
+    "workflows": [
+        "stargazers",
+        "issues",
+        "commits",
+        "contributors",
+        "deployments",
+        "forks",
+        "pull_requests",
+    ],
+}
 
 
 if __name__ == "__main__":
@@ -160,82 +234,8 @@ if __name__ == "__main__":
 
     # Initialize settings
     h = FORECAST_HORIZON_MONTHS
-    training_settings = {
-        "stargazers": [
-            "issues",
-            "commits",
-            "contributors",
-            "deployments",
-            "forks",
-            "pull_requests",
-            "workflows",
-        ],
-        "issues": [
-            "stargazers",
-            "commits",
-            "contributors",
-            "deployments",
-            "forks",
-            "pull_requests",
-            "workflows",
-        ],
-        "commits": [
-            "stargazers",
-            "issues",
-            "contributors",
-            "deployments",
-            "forks",
-            "pull_requests",
-            "workflows",
-        ],
-        "contributors": [
-            "stargazers",
-            "issues",
-            "commits",
-            "deployments",
-            "forks",
-            "pull_requests",
-            "workflows",
-        ],
-        "deployments": [
-            "stargazers",
-            "issues",
-            "commits",
-            "contributors",
-            "forks",
-            "pull_requests",
-            "workflows",
-        ],
-        "forks": [
-            "stargazers",
-            "issues",
-            "commits",
-            "contributors",
-            "deployments",
-            "pull_requests",
-            "workflows",
-        ],
-        "pull_requests": [
-            "stargazers",
-            "issues",
-            "commits",
-            "contributors",
-            "deployments",
-            "forks",
-            "workflows",
-        ],
-        "workflows": [
-            "stargazers",
-            "issues",
-            "commits",
-            "contributors",
-            "deployments",
-            "forks",
-            "pull_requests",
-        ],
-    }
 
-    for feature_target, dynamic_features in training_settings.items():
+    for feature_target, dynamic_features in TRAINING_SETTINGS.items():
         log.info(f"Train model for {feature_target} forecasting")
         # Train for specific metric forecast
         df_time_series = df_multi_time_series.rename(columns={feature_target: "y"})
