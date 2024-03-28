@@ -79,6 +79,54 @@ def extrapolate_phases_properties(metric_phases, metric_by_month):
     return extracted_features
 
 
+def _prepare_repository_clustering_phases_files(
+    repository_metrics_phases_count, phases_features
+):
+    """
+    Prepare files for the clustering script.
+
+    :param repository_metrics_phases_count: The phases count for each repository metric.
+    :param phases_features: The phases feature dataframe.
+    """
+    df_repository_phases_clustering_rows = []
+    repository_metrics_phases = {}
+    phases_rows_counter = 0
+    for (
+        repository_full_name,
+        repository_metrics,
+    ) in repository_metrics_phases_count.items():
+        metrics_phases_sequence = {}
+        repository_metrics_phases[repository_full_name] = {}
+        for metric, metric_phases_count in repository_metrics.items():
+            repository_metrics_phases[repository_full_name][metric] = []
+            phases_average = 0
+            for i in range(0, metric_phases_count):
+                item_value = phases_features["phase_order"][phases_rows_counter + i]
+                phases_average += item_value
+                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = item_value
+                repository_metrics_phases[repository_full_name][metric].append(
+                    int(item_value)
+                )
+
+                # Fill until max phases count with phases mean for the current metric
+            phases_average /= metric_phases_count
+            for i in range(metric_phases_count, max_clusters):
+                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = phases_average
+            phases_rows_counter += metric_phases_count
+        df_repository_phases_clustering_rows.append(metrics_phases_sequence)
+
+    df_repository_phases_clustering = pd.DataFrame(df_repository_phases_clustering_rows)
+    df_repository_phases_clustering["id"] = list(repository_metrics_phases_count.keys())
+    df_repository_phases_clustering = df_repository_phases_clustering.reindex(
+        sorted(df_repository_phases_clustering.columns), axis=1
+    )
+    df_repository_phases_clustering.to_csv(
+        "../data/time_series_clustering_phases.csv", index=False
+    )
+    with open("../data/repository_metrics_phases.json", "w") as outfile:
+        json.dump(repository_metrics_phases, outfile, indent=4)
+
+
 if __name__ == "__main__":
     log.info("Start GitHub statistics retrieval from Database")
 
@@ -231,43 +279,9 @@ if __name__ == "__main__":
     phases_features["phase_order"] = clustered_phases
 
     # Store repository phases sequence per metric
-    df_repository_phases_clustering_rows = []
-    repository_metrics_phases = {}
-    phases_rows_counter = 0
-    for (
-        repository_full_name,
-        repository_metrics,
-    ) in repository_metrics_phases_count.items():
-        metrics_phases_sequence = {}
-        repository_metrics_phases[repository_full_name] = {}
-        for metric, metric_phases_count in repository_metrics.items():
-            repository_metrics_phases[repository_full_name][metric] = []
-            phases_average = 0
-            for i in range(0, metric_phases_count):
-                item_value = phases_features["phase_order"][phases_rows_counter + i]
-                phases_average += item_value
-                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = item_value
-                repository_metrics_phases[repository_full_name][metric].append(
-                    int(item_value)
-                )
-
-                # Fill until max phases count with phases mean for the current metric
-            phases_average /= metric_phases_count
-            for i in range(metric_phases_count, max_clusters):
-                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = phases_average
-            phases_rows_counter += metric_phases_count
-        df_repository_phases_clustering_rows.append(metrics_phases_sequence)
-
-    df_repository_phases_clustering = pd.DataFrame(df_repository_phases_clustering_rows)
-    df_repository_phases_clustering["id"] = list(repository_metrics_phases_count.keys())
-    df_repository_phases_clustering = df_repository_phases_clustering.reindex(
-        sorted(df_repository_phases_clustering.columns), axis=1
+    _prepare_repository_clustering_phases_files(
+        repository_metrics_phases_count, phases_features
     )
-    df_repository_phases_clustering.to_csv(
-        "../data/time_series_clustering_phases.csv", index=False
-    )
-    with open("../data/repository_metrics_phases.json", "w") as outfile:
-        json.dump(repository_metrics_phases, outfile, indent=4)
 
     # Store polynomial coefficients
     phases_features = phases_features.groupby(["phase_order"]).mean()
