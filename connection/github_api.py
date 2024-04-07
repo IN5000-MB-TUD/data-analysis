@@ -264,6 +264,39 @@ class GitHubAPI:
 
         return commits_dates, commits_contributors
 
+    def get_repository_size(self, repository, commits):
+        """
+        Get repository changes size from GitHub.
+        Get the repository size from commits changes
+
+        :param repository: The repository data.
+        :param commits: The repository commits.
+        :return: The repository changes size from the GitHubAPI. None if an error occurs.
+        """
+        changes_size = {}
+
+        repository_owner = repository["owner"]
+        repository_name = repository["name"]
+        request_url = (
+            self.github_api_url + f"{repository_owner}/{repository_name}/commits/"
+        )
+
+        for commit_id, _ in commits.items():
+            github_api_response = self._make_request(
+                request_url + commit_id,
+                self.headers,
+                repository_owner,
+                repository_name,
+            )
+            if github_api_response is None:
+                return None
+            else:
+                changes_size[commit_id] = github_api_response.get(
+                    "stats", {"total": 0, "additions": 0, "deletions": 0}
+                )
+
+        return changes_size
+
     def get_repository_releases(self, repository_owner, repository_name):
         """
         Get releases data from GitHub.

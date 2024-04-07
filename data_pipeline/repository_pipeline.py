@@ -325,17 +325,29 @@ if __name__ == "__main__":
         )
 
         log.info(f"Plotting forecasted curve for metric {feature_target}...\n")
-        full_months = list(range(len(metrics_time_series[feature_target]["dates"]) + forecast_horizon))
-        full_values = metrics_time_series[feature_target]["values"] + forecasted_metric_values
+        full_months = list(
+            range(len(metrics_time_series[feature_target]["dates"]) + forecast_horizon)
+        )
+        full_values = (
+            metrics_time_series[feature_target]["values"] + forecasted_metric_values
+        )
         forecast_metric_plot = create_plot(
-            "Forecasted {} {}".format(feature_target, repository_db_record["full_name"]),
-            "Total: {} -> {}".format(metrics_time_series[feature_target]["values"][-1], full_values[-1]),
+            "Forecasted {} {}".format(
+                feature_target, repository_db_record["full_name"]
+            ),
+            "Total: {} -> {}".format(
+                metrics_time_series[feature_target]["values"][-1], full_values[-1]
+            ),
             "Date",
             "Count",
             full_months,
             [full_values],
         )
-        forecast_metric_plot.axvline(x=len(metrics_time_series[feature_target]["dates"]), color="g", label="axvline - full height")
+        forecast_metric_plot.axvline(
+            x=len(metrics_time_series[feature_target]["dates"]),
+            color="g",
+            label="axvline - full height",
+        )
         forecast_metric_plot.show()
 
     log.info("---------------------------------------------------\n")

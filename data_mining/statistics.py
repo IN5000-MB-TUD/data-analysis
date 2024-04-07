@@ -119,6 +119,20 @@ def update_repository_statistics_data(repository):
             "commits",
         )
 
+    repository_changes_size = github_api_client.get_repository_size(
+        repository, repository_commits_dates
+    )
+    if repository_changes_size is not None:
+        update_flag = _update_statistics(
+            "statistics_size",
+            repository["_id"],
+            repository["full_name"],
+            {
+                "size": repository_changes_size,
+            },
+            "size",
+        )
+
     repository_stargazers = github_api_client.get_repository_stargazers_time(repository)
     if repository_stargazers is not None:
         update_flag = _update_statistics(
