@@ -6,6 +6,7 @@ import ruptures as rpt
 from dateutil.relativedelta import relativedelta
 from matplotlib import pyplot as plt
 from pytz import utc
+from ruptures.exceptions import BadSegmentationParameters
 
 
 def group_util(date, min_date):
@@ -44,7 +45,7 @@ def group_metric_by_month(dates, total_months, min_date):
     return time_series_cumulative_by_month
 
 
-def time_series_phases(time_series, show_plot=False):
+def time_series_phases(time_series, show_plot=False, n_phases=None):
     if not time_series:
         return []
 
@@ -54,13 +55,22 @@ def time_series_phases(time_series, show_plot=False):
     else:
         time_series_np = np.array(time_series, dtype="int")
 
+    # Setup Window model with L2 cost function
     model = "l2"  # "l1", "rbf", "linear", "normal", "ar"
-    pen = np.log(time_series_np.shape[0]) * 1 * time_series_np.std() ** 2
-
     algo = rpt.Window(width=min(12, time_series_np.shape[0] - 1), model=model).fit(
         time_series_np
     )
-    phases_break_points = algo.predict(pen=pen)
+
+    pen = np.log(time_series_np.shape[0]) * 1 * time_series_np.std() ** 2
+
+    # Predict break points based on the given n_phases.
+    if n_phases is None:
+        phases_break_points = algo.predict(pen=pen)
+    else:
+        try:
+            phases_break_points = algo.predict(n_bkps=n_phases - 1)
+        except BadSegmentationParameters:
+            phases_break_points = algo.predict(pen=pen)
 
     if show_plot:
         rpt.show.display(

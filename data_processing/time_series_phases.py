@@ -13,7 +13,8 @@ from tsfresh.feature_extraction import ComprehensiveFCParameters
 
 from connection import mo
 from data_processing.t2f.model.clustering import ClusterWrapper
-from utils.data import get_stargazers_time_series, get_metric_time_series
+from utils.data import get_stargazers_time_series, get_metric_time_series, get_metrics_information, \
+    get_releases_time_series
 from utils.models import train_knn_classifier
 from utils.time_series import group_metric_by_month, time_series_phases
 
@@ -22,6 +23,7 @@ log = logging.getLogger(__name__)
 
 STATISTICAL_SETTINGS = ComprehensiveFCParameters()
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+N_PHASES = 5
 
 
 def extrapolate_phases_properties(metric_phases, metric_by_month):
@@ -81,7 +83,7 @@ def extrapolate_phases_properties(metric_phases, metric_by_month):
 
 
 def _prepare_repository_clustering_phases_files(
-    repository_metrics_phases_count, phases_features
+    repository_metrics_phases_count, phases_features, max_clusters
 ):
     """
     Prepare files for the clustering script.
@@ -150,50 +152,25 @@ if __name__ == "__main__":
 
             stargazers_dates, _ = get_stargazers_time_series(repository)
 
-            issues_dates, _ = get_metric_time_series(
-                repository, "statistics_issues", "issues", "created_at", "open_issues"
-            )
+            releases_dates, _ = get_releases_time_series(repository)
 
-            commits_dates, _ = get_metric_time_series(
-                repository, "statistics_commits", "commits", "date", "commits"
-            )
-
-            contributors_dates, _ = get_metric_time_series(
-                repository, "statistics_commits", "contributors", "first_commit", None
-            )
-
-            deployments_dates, _ = get_metric_time_series(
-                repository, "statistics_deployments", "deployments", "created_at", None
-            )
-
-            forks_dates, _ = get_metric_time_series(
-                repository, "statistics_forks", "forks", "created_at", "forks_count"
-            )
-
-            pull_requests_dates, _ = get_metric_time_series(
-                repository,
-                "statistics_pull_requests",
-                "pull_requests",
-                "created_at",
-                None,
-            )
-
-            workflows_dates, _ = get_metric_time_series(
-                repository, "statistics_workflow_runs", "workflows", "created_at", None
-            )
-
-            # Compute time series phases
             time_series_dates = {
                 "stargazers": stargazers_dates,
-                "issues": issues_dates,
-                "commits": commits_dates,
-                "contributors": contributors_dates,
-                "deployments": deployments_dates,
-                "forks": forks_dates,
-                "pull_requests": pull_requests_dates,
-                "workflows": workflows_dates,
+                "releases": releases_dates,
             }
 
+            for metric in get_metrics_information():
+                metric_dates, _ = get_metric_time_series(
+                    repository,
+                    metric[0],
+                    metric[1],
+                    metric[2],
+                    metric[3],
+                )
+
+                time_series_dates[metric[1]] = metric_dates
+
+            # Compute time series phases
             time_series_phases_idxs = {}
             time_series_metrics_by_month = {}
 
@@ -201,7 +178,7 @@ if __name__ == "__main__":
                 metric_by_month = group_metric_by_month(
                     metric_dates, repository_age_months, repository_age_start
                 )
-                metric_phases_idxs = time_series_phases(metric_by_month)
+                metric_phases_idxs = time_series_phases(metric_by_month, n_phases=N_PHASES)
                 time_series_phases_idxs[metric] = metric_phases_idxs
                 time_series_metrics_by_month[metric] = metric_by_month
 
@@ -287,7 +264,7 @@ if __name__ == "__main__":
 
     # Store repository phases sequence per metric
     _prepare_repository_clustering_phases_files(
-        repository_metrics_phases_count, phases_features
+        repository_metrics_phases_count, phases_features, max_clusters
     )
 
     # Store polynomial coefficients

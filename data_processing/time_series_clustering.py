@@ -14,7 +14,7 @@ from data_processing.t2f.model.clustering import ClusterWrapper
 from utils.data import (
     get_stargazers_time_series,
     get_metric_time_series,
-    get_metrics_information,
+    get_metrics_information, get_releases_time_series,
 )
 from utils.main import normalize, proper_round
 from utils.models import train_knn_classifier
@@ -73,6 +73,24 @@ if __name__ == "__main__":
                 [
                     (stargazers_by_month_dates[i], stargazers_by_month_values[i])
                     for i in range(len(stargazers_by_month_dates))
+                ]
+            )
+
+            releases_dates, _ = get_releases_time_series(repository)
+            releases_by_month = group_metric_by_month(
+                releases_dates, repository_age_months, repository_age_start
+            )
+            releases_by_month_dates, releases_by_month_values = zip(
+                *releases_by_month
+            )
+            releases_by_month_dates = list(releases_by_month_dates)
+            releases_by_month_values = list(releases_by_month_values)
+            releases_by_month_values = normalize(releases_by_month_values, 0, 1)
+
+            metrics_values_pairs.append(
+                [
+                    (releases_by_month_dates[i], releases_by_month_values[i])
+                    for i in range(len(releases_by_month_dates))
                 ]
             )
 
@@ -164,11 +182,11 @@ if __name__ == "__main__":
     clustered_repositories = model.fit_predict(df_feats)
 
     # Train and save classifier model
-    train_knn_classifier(
-        df_feats,
-        clustered_repositories,
-        "../models/clustering/mts_clustering_classifier.pickle",
-    )
+    # train_knn_classifier(
+    #     df_feats,
+    #     clustered_repositories,
+    #     "../models/clustering/mts_clustering_classifier.pickle",
+    # )
 
     # Print clustered repositories
     df_feats["cluster"] = clustered_repositories
@@ -181,6 +199,7 @@ if __name__ == "__main__":
     for idx, row in df_feats.iterrows():
         cluster_metrics_phases[f"cluster_{idx}"] = {
             "stargazers": [],
+            "releases": [],
             "issues": [],
             "commits": [],
             "contributors": [],
