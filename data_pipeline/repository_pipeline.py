@@ -19,7 +19,7 @@ from utils.data import (
     get_metrics_information,
     get_metric_time_series,
 )
-from utils.main import normalize
+from utils.main import normalize, proper_round
 from utils.time_series import group_metric_by_month, time_series_phases
 
 # Setup logging
@@ -119,16 +119,17 @@ if __name__ == "__main__":
         }
 
     # Plot metrics curves
-    for metric, metric_data in metrics_time_series.items():
-        log.info(f"Plotting metric {metric} curve")
-        create_plot(
-            "{} {}".format(metric, repository_db_record["full_name"]),
-            "Total: {}".format(metric_data["values"][-1]),
-            "Date",
-            "Count",
-            metric_data["dates"],
-            [metric_data["values"]],
-        )
+    # for metric, metric_data in metrics_time_series.items():
+    #     log.info(f"Plotting metric {metric} curve")
+    #     metric_plot = create_plot(
+    #         "{} {}".format(metric, repository_db_record["full_name"]),
+    #         "Total: {}".format(metric_data["values"][-1]),
+    #         "Date",
+    #         "Count",
+    #         metric_data["dates"],
+    #         [metric_data["values"]],
+    #     )
+    #     metric_plot.show()
 
     log.info("---------------------------------------------------\n")
 
@@ -294,27 +295,59 @@ if __name__ == "__main__":
         )
 
         # Build the data frames
-        df_time_series = df_multi_time_series.rename(columns={feature_target: "y"})
-        df_predict = (
-            df_time_series.head(-forecast_horizon)
-            .reset_index(drop=True)
-            .set_index(dynamic_features, append=True)
-        )
-        df_validate = (
-            df_time_series.tail(forecast_horizon)
+        df_time_series = (
+            df_multi_time_series.rename(columns={feature_target: "y"})
             .reset_index(drop=True)
             .set_index(dynamic_features, append=True)
         )
 
+        # Forecast values
         df_forecast = forecasting_model.predict(
             h=forecast_horizon,
-            new_df=df_predict,
+            new_df=df_time_series,
         ).merge(
-            df_validate[["unique_id", "ds", "y"]], on=["unique_id", "ds"], how="left"
+            df_time_series[["unique_id", "ds", "y"]], on=["unique_id", "ds"], how="left"
         )
 
-        # Plot time frames
-        fig = plot_series(df_predict, df_forecast)
-        fig.show()
+        # Evaluate forecasted phases
+        forecasted_metric_values = df_forecast["XGBRegressor"].tolist()
+        forecasted_metric_values = list(map(proper_round, forecasted_metric_values))
+        forecasted_metric_phases = time_series_phases(forecasted_metric_values)
+        df_forecasted_metric_phases_features = extrapolate_phases_properties(
+            forecasted_metric_phases, forecasted_metric_values
+        )
+
+        forecasted_clustered_phases = phases_clustering_model.predict(
+            df_forecasted_metric_phases_features.drop(columns=["phase_order"])
+        )
+        log.info(
+            f"The forecasted phases for the metric {feature_target} in the next {forecast_horizon} months are: {forecasted_clustered_phases}"
+        )
+
+        log.info(f"Plotting forecasted curve for metric {feature_target}...\n")
+        full_months = list(
+            range(len(metrics_time_series[feature_target]["dates"]) + forecast_horizon)
+        )
+        full_values = (
+            metrics_time_series[feature_target]["values"] + forecasted_metric_values
+        )
+        forecast_metric_plot = create_plot(
+            "Forecasted {} {}".format(
+                feature_target, repository_db_record["full_name"]
+            ),
+            "Total: {} -> {}".format(
+                metrics_time_series[feature_target]["values"][-1], full_values[-1]
+            ),
+            "Date",
+            "Count",
+            full_months,
+            [full_values],
+        )
+        forecast_metric_plot.axvline(
+            x=len(metrics_time_series[feature_target]["dates"]),
+            color="g",
+            label="axvline - full height",
+        )
+        forecast_metric_plot.show()
 
     log.info("---------------------------------------------------\n")
