@@ -48,7 +48,9 @@ def group_metric_by_month(dates, total_months, min_date, monotonic=True):
     return time_series_cumulative_by_month
 
 
-def time_series_phases(time_series, show_plot=False, n_phases=None, window_size=12):
+def time_series_phases(
+    time_series, show_plot=False, n_phases=None, window_size=12, plot_title=""
+):
     if not time_series:
         return []
 
@@ -76,9 +78,16 @@ def time_series_phases(time_series, show_plot=False, n_phases=None, window_size=
             phases_break_points = algo.predict(pen=pen)
 
     if show_plot:
-        rpt.show.display(
+        fig, axarr = rpt.show.display(
             time_series_np, phases_break_points, phases_break_points, figsize=(10, 6)
         )
+
+        if fig and axarr:
+            fig.tight_layout(pad=2)
+            axarr[0].set_title(f"{plot_title} phases")
+            axarr[0].set_xlabel("Month")
+            axarr[0].set_ylabel("Count")
+
         plt.show()
 
     return phases_break_points
