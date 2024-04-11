@@ -17,7 +17,7 @@ from data_processing.time_series_plot import create_plot
 from utils.data import (
     get_stargazers_time_series,
     get_metrics_information,
-    get_metric_time_series,
+    get_metric_time_series, get_releases_time_series,
 )
 from utils.main import normalize, proper_round
 from utils.time_series import group_metric_by_month, time_series_phases
@@ -25,7 +25,7 @@ from utils.time_series import group_metric_by_month, time_series_phases
 # Setup logging
 log = logging.getLogger(__name__)
 
-REPOSITORY_FULL_NAME = "kubernetes/kubernetes"
+REPOSITORY_FULL_NAME = "saltstack/salt"
 
 
 if __name__ == "__main__":
@@ -96,6 +96,19 @@ if __name__ == "__main__":
         "values": stargazers_by_month_values,
     }
 
+    releases_dates, _ = get_releases_time_series(repository_db_record)
+    releases_by_month = group_metric_by_month(
+        releases_dates, repository_age_months, repository_age_start
+    )
+    releases_by_month_dates, releases_by_month_values = zip(*releases_by_month)
+    releases_by_month_dates = list(releases_by_month_dates)
+    releases_by_month_values = list(releases_by_month_values)
+
+    metrics_time_series["releases"] = {
+        "dates": releases_by_month_dates,
+        "values": releases_by_month_values,
+    }
+
     for metric in get_metrics_information():
         metric_dates, _ = get_metric_time_series(
             repository_db_record,
@@ -119,17 +132,17 @@ if __name__ == "__main__":
         }
 
     # Plot metrics curves
-    # for metric, metric_data in metrics_time_series.items():
-    #     log.info(f"Plotting metric {metric} curve")
-    #     metric_plot = create_plot(
-    #         "{} {}".format(metric, repository_db_record["full_name"]),
-    #         "Total: {}".format(metric_data["values"][-1]),
-    #         "Date",
-    #         "Count",
-    #         metric_data["dates"],
-    #         [metric_data["values"]],
-    #     )
-    #     metric_plot.show()
+    for metric, metric_data in metrics_time_series.items():
+        log.info(f"Plotting metric {metric} curve")
+        metric_plot = create_plot(
+            "{} {}".format(metric, repository_db_record["full_name"]),
+            "Total: {}".format(metric_data["values"][-1]),
+            "Date",
+            "Count",
+            metric_data["dates"],
+            [metric_data["values"]],
+        )
+        metric_plot.show()
 
     log.info("---------------------------------------------------\n")
 
@@ -139,7 +152,7 @@ if __name__ == "__main__":
     log.info("Computing metrics phases...")
     metrics_phases = {}
     for metric, metric_data in metrics_time_series.items():
-        metric_phases_idxs = time_series_phases(metric_data["values"])
+        metric_phases_idxs = time_series_phases(metric_data["values"], show_plot=True, n_phases=5)
         metrics_phases[metric] = {
             "phases": metric_phases_idxs,
             "phases_count": len(metric_phases_idxs),

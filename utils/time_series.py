@@ -13,7 +13,7 @@ def group_util(date, min_date):
     return (date - min_date).days // 31
 
 
-def group_metric_by_month(dates, total_months, min_date):
+def group_metric_by_month(dates, total_months, min_date, monotonic=True):
     """Group given list of dates by month."""
     if not dates:
         return []
@@ -30,12 +30,15 @@ def group_metric_by_month(dates, total_months, min_date):
     metric_counter = -1
     dates_grouped_idx = 0
     grouped_months_count = len(dates_grouped)
-    for month_idx in range(total_months):
+    for month_idx in range(total_months + 1):
         if (
             dates_grouped_idx < grouped_months_count
             and month_idx == dates_grouped[dates_grouped_idx][0]
         ):
-            metric_counter += len(dates_grouped[dates_grouped_idx][1])
+            if monotonic:
+                metric_counter += len(dates_grouped[dates_grouped_idx][1])
+            else:
+                metric_counter = len(dates_grouped[dates_grouped_idx][1])
             dates_grouped_idx += 1
 
         time_series_cumulative_by_month.append(
@@ -45,7 +48,7 @@ def group_metric_by_month(dates, total_months, min_date):
     return time_series_cumulative_by_month
 
 
-def time_series_phases(time_series, show_plot=False, n_phases=None):
+def time_series_phases(time_series, show_plot=False, n_phases=None, window_size=12):
     if not time_series:
         return []
 
@@ -57,7 +60,7 @@ def time_series_phases(time_series, show_plot=False, n_phases=None):
 
     # Setup Window model with L2 cost function
     model = "l2"  # "l1", "rbf", "linear", "normal", "ar"
-    algo = rpt.Window(width=min(12, time_series_np.shape[0] - 1), model=model).fit(
+    algo = rpt.Window(width=min(window_size, time_series_np.shape[0] - 1), model=model).fit(
         time_series_np
     )
 
