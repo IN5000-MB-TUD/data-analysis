@@ -60,9 +60,9 @@ def time_series_phases(time_series, show_plot=False, n_phases=None, window_size=
 
     # Setup Window model with L2 cost function
     model = "l2"  # "l1", "rbf", "linear", "normal", "ar"
-    algo = rpt.Window(width=min(window_size, time_series_np.shape[0] - 1), model=model).fit(
-        time_series_np
-    )
+    algo = rpt.Window(
+        width=min(window_size, time_series_np.shape[0] - 1), model=model
+    ).fit(time_series_np)
 
     pen = np.log(time_series_np.shape[0]) * 1 * time_series_np.std() ** 2
 

@@ -41,7 +41,9 @@ def get_releases_time_series(repository):
     if repository_releases is None:
         repository_releases = {}
 
-    releases_dates = [repository["created_at"]] + [release["created_at"] for release in repository_releases.values()]
+    releases_dates = [repository["created_at"]] + [
+        release["created_at"] for release in repository_releases.values()
+    ]
     releases_dates.sort()
     releases_cumulative = [0]
     releases_counter = 0

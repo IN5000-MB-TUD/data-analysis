@@ -17,7 +17,8 @@ from data_processing.time_series_plot import create_plot
 from utils.data import (
     get_stargazers_time_series,
     get_metrics_information,
-    get_metric_time_series, get_releases_time_series,
+    get_metric_time_series,
+    get_releases_time_series,
 )
 from utils.main import normalize, proper_round
 from utils.time_series import group_metric_by_month, time_series_phases
@@ -152,7 +153,9 @@ if __name__ == "__main__":
     log.info("Computing metrics phases...")
     metrics_phases = {}
     for metric, metric_data in metrics_time_series.items():
-        metric_phases_idxs = time_series_phases(metric_data["values"], show_plot=True, n_phases=5)
+        metric_phases_idxs = time_series_phases(
+            metric_data["values"], show_plot=True, n_phases=5
+        )
         metrics_phases[metric] = {
             "phases": metric_phases_idxs,
             "phases_count": len(metric_phases_idxs),

@@ -13,8 +13,12 @@ from tsfresh.feature_extraction import ComprehensiveFCParameters
 
 from connection import mo
 from data_processing.t2f.model.clustering import ClusterWrapper
-from utils.data import get_stargazers_time_series, get_metric_time_series, get_metrics_information, \
-    get_releases_time_series
+from utils.data import (
+    get_stargazers_time_series,
+    get_metric_time_series,
+    get_metrics_information,
+    get_releases_time_series,
+)
 from utils.models import train_knn_classifier
 from utils.time_series import group_metric_by_month, time_series_phases
 
@@ -178,7 +182,9 @@ if __name__ == "__main__":
                 metric_by_month = group_metric_by_month(
                     metric_dates, repository_age_months, repository_age_start
                 )
-                metric_phases_idxs = time_series_phases(metric_by_month, n_phases=N_PHASES)
+                metric_phases_idxs = time_series_phases(
+                    metric_by_month, n_phases=N_PHASES
+                )
                 time_series_phases_idxs[metric] = metric_phases_idxs
                 time_series_metrics_by_month[metric] = metric_by_month
 

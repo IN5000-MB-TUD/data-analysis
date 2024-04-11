@@ -14,7 +14,8 @@ from data_processing.t2f.model.clustering import ClusterWrapper
 from utils.data import (
     get_stargazers_time_series,
     get_metric_time_series,
-    get_metrics_information, get_releases_time_series,
+    get_metrics_information,
+    get_releases_time_series,
 )
 from utils.main import normalize, proper_round
 from utils.models import train_knn_classifier
@@ -80,9 +81,7 @@ if __name__ == "__main__":
             releases_by_month = group_metric_by_month(
                 releases_dates, repository_age_months, repository_age_start
             )
-            releases_by_month_dates, releases_by_month_values = zip(
-                *releases_by_month
-            )
+            releases_by_month_dates, releases_by_month_values = zip(*releases_by_month)
             releases_by_month_dates = list(releases_by_month_dates)
             releases_by_month_values = list(releases_by_month_values)
             releases_by_month_values = normalize(releases_by_month_values, 0, 1)
