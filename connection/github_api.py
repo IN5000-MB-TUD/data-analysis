@@ -1,10 +1,14 @@
 import logging
 import os
 from datetime import datetime
+from itertools import groupby
 from math import ceil
 
 import requests
 from pytz import utc
+from requests import Timeout
+
+from utils.time_series import group_util
 
 # Setup logging
 log = logging.getLogger(__name__)
@@ -54,18 +58,21 @@ class GitHubAPI:
         if not self._is_authenticated():
             return None
 
-        github_api_response = requests.get(request_url, headers=headers)
-        if github_api_response.status_code != 200:
-            log.error(
-                f"The request for repository {repository_owner}/{repository_name} returned a status code "
-                f"{github_api_response.status_code}: {github_api_response.reason}"
-            )
-            return (
-                None
-                if github_api_response.status_code != 422
-                and github_api_response.status_code != 204
-                else {}
-            )
+        try:
+            github_api_response = requests.get(request_url, headers=headers)
+            if github_api_response.status_code != 200:
+                log.error(
+                    f"The request for repository {repository_owner}/{repository_name} returned a status code "
+                    f"{github_api_response.status_code}: {github_api_response.reason}"
+                )
+                return (
+                    None
+                    if github_api_response.status_code != 422
+                    and github_api_response.status_code != 204
+                    else {}
+                )
+        except Timeout:
+            return {}
 
         return github_api_response.json()
 
@@ -281,9 +288,28 @@ class GitHubAPI:
             self.github_api_url + f"{repository_owner}/{repository_name}/commits/"
         )
 
-        for commit_id, _ in commits.items():
+        # Pick one commit per month, if any
+        commits_by_dates = {commit["date"]: commit_sha for commit_sha, commit in commits.items()}
+        repository_age_start = repository["created_at"].replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        dates_grouped = []
+        commits_dates = list(commits_by_dates.keys())
+        commits_dates.sort()
+
+        for key, val in groupby(commits_dates, key=lambda date: group_util(date, repository_age_start)):
+            # Keep only months that are >= 0
+            if key >= 0:
+                dates_grouped.append((key, list(val)))
+
+        commits_sha = []
+        for dates_tuple in dates_grouped:
+            commit_date = dates_tuple[1][-1]
+            commits_sha.append((commits_by_dates[commit_date], commit_date))
+
+        for commit_sha, commit_date in commits_sha:
             github_api_response = self._make_request(
-                request_url + commit_id,
+                request_url + commit_sha,
                 self.headers,
                 repository_owner,
                 repository_name,
@@ -291,9 +317,12 @@ class GitHubAPI:
             if github_api_response is None:
                 return None
             else:
-                changes_size[commit_id] = github_api_response.get(
+                commit_stats = github_api_response.get(
                     "stats", {"total": 0, "additions": 0, "deletions": 0}
                 )
+                commit_stats["size"] = commit_stats["additions"] - commit_stats["deletions"]
+                commit_stats["date"] = commit_date
+                changes_size[commit_sha] = commit_stats
 
         return changes_size
 
