@@ -133,17 +133,17 @@ if __name__ == "__main__":
         }
 
     # Plot metrics curves
-    # for metric, metric_data in metrics_time_series.items():
-    #     log.info(f"Plotting metric {metric} curve")
-    #     metric_plot = create_plot(
-    #         "{} {}".format(metric, repository_db_record["full_name"]),
-    #         "Total: {}".format(metric_data["values"][-1]),
-    #         "Date",
-    #         "Count",
-    #         metric_data["dates"],
-    #         [metric_data["values"]],
-    #     )
-    #     metric_plot.show()
+    for metric, metric_data in metrics_time_series.items():
+        log.info(f"Plotting metric {metric} curve")
+        metric_plot = create_plot(
+            "{} {}".format(metric, repository_db_record["full_name"]),
+            "Total: {}".format(metric_data["values"][-1]),
+            "Date",
+            "Count",
+            metric_data["dates"],
+            [metric_data["values"]],
+        )
+        metric_plot.show()
 
     log.info("---------------------------------------------------\n")
 
