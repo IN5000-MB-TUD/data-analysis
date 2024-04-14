@@ -289,7 +289,9 @@ class GitHubAPI:
         )
 
         # Pick one commit per month, if any
-        commits_by_dates = {commit["date"]: commit_sha for commit_sha, commit in commits.items()}
+        commits_by_dates = {
+            commit["date"]: commit_sha for commit_sha, commit in commits.items()
+        }
         repository_age_start = repository["created_at"].replace(
             day=1, hour=0, minute=0, second=0, microsecond=0
         )
@@ -297,7 +299,9 @@ class GitHubAPI:
         commits_dates = list(commits_by_dates.keys())
         commits_dates.sort()
 
-        for key, val in groupby(commits_dates, key=lambda date: group_util(date, repository_age_start)):
+        for key, val in groupby(
+            commits_dates, key=lambda date: group_util(date, repository_age_start)
+        ):
             # Keep only months that are >= 0
             if key >= 0:
                 dates_grouped.append((key, list(val)))
@@ -320,7 +324,9 @@ class GitHubAPI:
                 commit_stats = github_api_response.get(
                     "stats", {"total": 0, "additions": 0, "deletions": 0}
                 )
-                commit_stats["size"] = commit_stats["additions"] - commit_stats["deletions"]
+                commit_stats["size"] = (
+                    commit_stats["additions"] - commit_stats["deletions"]
+                )
                 commit_stats["date"] = commit_date
                 changes_size[commit_sha] = commit_stats
 

@@ -24,6 +24,9 @@ METRICS_QUERY = {
     "pull_requests": {
         "pull_requests": {},
     },
+    "size": {
+        "size": {},
+    },
     "stargazers": {
         "stargazers": [],
     },

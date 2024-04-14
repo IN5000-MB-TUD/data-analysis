@@ -86,41 +86,38 @@ def update_repository_statistics_data(repository):
         )
         return False
 
-    # repository_commits_count = github_api_client.get_repository_commits_count(
-    #     repository["owner"], repository["name"]
-    # )
-    # if repository_commits_count is not None:
-    #     _update_statistics(
-    #         "repositories_data",
-    #         None,
-    #         repository["full_name"],
-    #         {
-    #             "commits": repository_commits_count,
-    #         },
-    #         "commits count",
-    #     )
-    #     repository["commits"] = repository_commits_count
-    # else:
-    #     return False
-    #
-    # (
-    #     repository_commits_dates,
-    #     repository_contributors,
-    # ) = github_api_client.get_repository_commits(repository)
-    # if repository_commits_dates is not None:
-    #     update_flag = _update_statistics(
-    #         "statistics_commits",
-    #         repository["_id"],
-    #         repository["full_name"],
-    #         {
-    #             "commits": repository_commits_dates,
-    #             "contributors": repository_contributors,
-    #         },
-    #         "commits",
-    #     )
+    repository_commits_count = github_api_client.get_repository_commits_count(
+        repository["owner"], repository["name"]
+    )
+    if repository_commits_count is not None:
+        _update_statistics(
+            "repositories_data",
+            None,
+            repository["full_name"],
+            {
+                "commits": repository_commits_count,
+            },
+            "commits count",
+        )
+        repository["commits"] = repository_commits_count
+    else:
+        return False
 
-    repository_commits = mo.db["statistics_commits"].find_one({"repository_id": repository["_id"]})
-    repository_commits_dates = repository_commits["commits"]
+    (
+        repository_commits_dates,
+        repository_contributors,
+    ) = github_api_client.get_repository_commits(repository)
+    if repository_commits_dates is not None:
+        update_flag = _update_statistics(
+            "statistics_commits",
+            repository["_id"],
+            repository["full_name"],
+            {
+                "commits": repository_commits_dates,
+                "contributors": repository_contributors,
+            },
+            "commits",
+        )
 
     repository_changes_size = github_api_client.get_repository_size(
         repository, repository_commits_dates
@@ -136,115 +133,115 @@ def update_repository_statistics_data(repository):
             "size",
         )
 
-    # repository_stargazers = github_api_client.get_repository_stargazers_time(repository)
-    # if repository_stargazers is not None:
-    #     update_flag = _update_statistics(
-    #         "statistics_stargazers",
-    #         repository["_id"],
-    #         repository["full_name"],
-    #         {
-    #             "stargazers": repository_stargazers,
-    #         },
-    #         "stargazers",
-    #     )
-    #
-    # repository_issues = github_api_client.get_repository_issues_time(repository)
-    # if repository_issues is not None:
-    #     update_flag = _update_statistics(
-    #         "statistics_issues",
-    #         repository["_id"],
-    #         repository["full_name"],
-    #         {
-    #             "issues": repository_issues,
-    #         },
-    #         "issues",
-    #     )
-    #
-    # repository_workflows = github_api_client.get_repository_workflows(
-    #     repository["owner"], repository["name"]
-    # )
-    # if repository_workflows is not None:
-    #     update_flag = _update_statistics(
-    #         "repositories_data",
-    #         None,
-    #         repository["full_name"],
-    #         {
-    #             "workflows": repository_workflows,
-    #         },
-    #         "workflows data",
-    #     )
-    #
-    # repository_workflow_runs = github_api_client.get_repository_workflows_time(
-    #     repository["owner"], repository["name"]
-    # )
-    # if repository_workflow_runs is not None:
-    #     update_flag = _update_statistics(
-    #         "statistics_workflow_runs",
-    #         repository["_id"],
-    #         repository["full_name"],
-    #         {
-    #             "workflows": repository_workflow_runs,
-    #         },
-    #         "workflows",
-    #     )
-    #
-    # repository_environments = github_api_client.get_repository_environments(
-    #     repository["owner"], repository["name"]
-    # )
-    # if repository_environments is not None:
-    #     update_flag = _update_statistics(
-    #         "repositories_data",
-    #         None,
-    #         repository["full_name"],
-    #         {
-    #             "environments": repository_environments,
-    #         },
-    #         "environments data",
-    #     )
-    #
-    # repository_deployments = github_api_client.get_repository_deployments(
-    #     repository["owner"],
-    #     repository["name"],
-    #     repository_environments if repository_environments else {},
-    # )
-    # if repository_deployments is not None:
-    #     update_flag = _update_statistics(
-    #         "statistics_deployments",
-    #         repository["_id"],
-    #         repository["full_name"],
-    #         {
-    #             "deployments": repository_deployments,
-    #         },
-    #         "deployments",
-    #     )
-    #
-    # repository_pull_requests = github_api_client.get_repository_pull_requests_time(
-    #     repository["owner"],
-    #     repository["name"],
-    #     repository.get("default_branch", ""),
-    # )
-    # if repository_pull_requests is not None:
-    #     update_flag = _update_statistics(
-    #         "statistics_pull_requests",
-    #         repository["_id"],
-    #         repository["full_name"],
-    #         {
-    #             "pull_requests": repository_pull_requests,
-    #         },
-    #         "pull_requests",
-    #     )
-    #
-    # repository_forks = github_api_client.get_repository_forks(repository)
-    # if repository_forks is not None:
-    #     update_flag = _update_statistics(
-    #         "statistics_forks",
-    #         repository["_id"],
-    #         repository["full_name"],
-    #         {
-    #             "forks": repository_forks,
-    #         },
-    #         "forks",
-    #     )
+    repository_stargazers = github_api_client.get_repository_stargazers_time(repository)
+    if repository_stargazers is not None:
+        update_flag = _update_statistics(
+            "statistics_stargazers",
+            repository["_id"],
+            repository["full_name"],
+            {
+                "stargazers": repository_stargazers,
+            },
+            "stargazers",
+        )
+
+    repository_issues = github_api_client.get_repository_issues_time(repository)
+    if repository_issues is not None:
+        update_flag = _update_statistics(
+            "statistics_issues",
+            repository["_id"],
+            repository["full_name"],
+            {
+                "issues": repository_issues,
+            },
+            "issues",
+        )
+
+    repository_workflows = github_api_client.get_repository_workflows(
+        repository["owner"], repository["name"]
+    )
+    if repository_workflows is not None:
+        update_flag = _update_statistics(
+            "repositories_data",
+            None,
+            repository["full_name"],
+            {
+                "workflows": repository_workflows,
+            },
+            "workflows data",
+        )
+
+    repository_workflow_runs = github_api_client.get_repository_workflows_time(
+        repository["owner"], repository["name"]
+    )
+    if repository_workflow_runs is not None:
+        update_flag = _update_statistics(
+            "statistics_workflow_runs",
+            repository["_id"],
+            repository["full_name"],
+            {
+                "workflows": repository_workflow_runs,
+            },
+            "workflows",
+        )
+
+    repository_environments = github_api_client.get_repository_environments(
+        repository["owner"], repository["name"]
+    )
+    if repository_environments is not None:
+        update_flag = _update_statistics(
+            "repositories_data",
+            None,
+            repository["full_name"],
+            {
+                "environments": repository_environments,
+            },
+            "environments data",
+        )
+
+    repository_deployments = github_api_client.get_repository_deployments(
+        repository["owner"],
+        repository["name"],
+        repository_environments if repository_environments else {},
+    )
+    if repository_deployments is not None:
+        update_flag = _update_statistics(
+            "statistics_deployments",
+            repository["_id"],
+            repository["full_name"],
+            {
+                "deployments": repository_deployments,
+            },
+            "deployments",
+        )
+
+    repository_pull_requests = github_api_client.get_repository_pull_requests_time(
+        repository["owner"],
+        repository["name"],
+        repository.get("default_branch", ""),
+    )
+    if repository_pull_requests is not None:
+        update_flag = _update_statistics(
+            "statistics_pull_requests",
+            repository["_id"],
+            repository["full_name"],
+            {
+                "pull_requests": repository_pull_requests,
+            },
+            "pull_requests",
+        )
+
+    repository_forks = github_api_client.get_repository_forks(repository)
+    if repository_forks is not None:
+        update_flag = _update_statistics(
+            "statistics_forks",
+            repository["_id"],
+            repository["full_name"],
+            {
+                "forks": repository_forks,
+            },
+            "forks",
+        )
 
     # Update the metadata
     if update_flag:
@@ -268,7 +265,7 @@ if __name__ == "__main__":
 
     # Get the repositories in the database
     repositories_data = mo.db["repositories_data"].find(
-        {"statistics": {"$exists": True}}
+        {"statistics": {"$exists": STATISTICS_EXIST}}
     )
 
     for repository_data in repositories_data:
