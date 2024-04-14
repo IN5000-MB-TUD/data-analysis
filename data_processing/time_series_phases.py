@@ -18,9 +18,14 @@ from utils.data import (
     get_metric_time_series,
     get_metrics_information,
     get_releases_time_series,
+    get_size_time_series,
 )
 from utils.models import train_knn_classifier
-from utils.time_series import group_metric_by_month, time_series_phases
+from utils.time_series import (
+    group_metric_by_month,
+    time_series_phases,
+    group_size_by_month,
+)
 
 # Setup logging
 log = logging.getLogger(__name__)
@@ -193,6 +198,31 @@ if __name__ == "__main__":
                 )
                 log.info(f"{metric} phases: {metric_phases_idxs}")
 
+            # Handle repository size time series data
+            (
+                repository_actions_dates,
+                repository_actions_total,
+                _,
+            ) = get_size_time_series(repository)
+            time_series_dates["size"] = repository_actions_dates
+            size_by_month = group_size_by_month(
+                repository_actions_dates,
+                repository_actions_total,
+                repository_age_months,
+                repository_age_start,
+            )
+            size_phases_idxs = time_series_phases(
+                size_by_month,
+                n_phases=N_PHASES,
+            )
+            time_series_phases_idxs["size"] = size_phases_idxs
+            time_series_metrics_by_month["size"] = size_by_month
+
+            repository_metrics_phases_count[repository["full_name"]]["size"] = len(
+                size_phases_idxs
+            )
+            log.info(f"size phases: {size_phases_idxs}")
+
             # Extrapolate metrics time series phases statistical properties
             for metric in time_series_dates.keys():
                 metric_phases = time_series_phases_idxs[metric]
@@ -260,13 +290,30 @@ if __name__ == "__main__":
 
     # Cluster repos
     clustered_phases = model.fit_predict(df_phases)
-
-    # Save classifier model
-    train_knn_classifier(
-        df_phases, clustered_phases, "../models/phases/mts_phases_classifier.pickle"
-    )
-
     phases_features["phase_order"] = clustered_phases
+    df_phases["phase_order"] = clustered_phases
+
+    # Cleanup outliers
+    phases_count = (
+        phases_features.groupby(["phase_order"]).size().reset_index(name="counts")
+    )
+    valid_phases = []
+    for phase_idx, phase_count in enumerate(phases_count["counts"]):
+        if phase_count > 5:
+            valid_phases.append(phase_idx)
+
+    phases_features = phases_features[phases_features["phase_order"].isin(valid_phases)]
+    df_phases = df_phases[df_phases["phase_order"].isin(valid_phases)]
+    df_phases = df_phases.drop(columns=["phase_order"])
+
+    clustered_phases = phases_features["phase_order"].to_numpy()
+
+    # Check if classifier model exists
+    if not Path("../models/phases/mts_phases_classifier.pickle").exists():
+        # Save classifier model
+        train_knn_classifier(
+            df_phases, clustered_phases, "../models/phases/mts_phases_classifier.pickle"
+        )
 
     # Store repository phases sequence per metric
     _prepare_repository_clustering_phases_files(

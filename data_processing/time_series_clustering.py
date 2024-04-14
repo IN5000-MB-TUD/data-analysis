@@ -181,11 +181,11 @@ if __name__ == "__main__":
     clustered_repositories = model.fit_predict(df_feats)
 
     # Train and save classifier model
-    # train_knn_classifier(
-    #     df_feats,
-    #     clustered_repositories,
-    #     "../models/clustering/mts_clustering_classifier.pickle",
-    # )
+    train_knn_classifier(
+        df_feats,
+        clustered_repositories,
+        "../models/clustering/mts_clustering_classifier.pickle",
+    )
 
     # Print clustered repositories
     df_feats["cluster"] = clustered_repositories
