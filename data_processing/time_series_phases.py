@@ -297,15 +297,19 @@ if __name__ == "__main__":
     phases_count = (
         phases_features.groupby(["phase_order"]).size().reset_index(name="counts")
     )
-    valid_phases = []
+    invalid_phases = []
     for phase_idx, phase_count in enumerate(phases_count["counts"]):
-        if phase_count > 5:
-            valid_phases.append(phase_idx)
+        if phase_count <= 5:
+            invalid_phases.append(phase_idx)
 
-    phases_features = phases_features[phases_features["phase_order"].isin(valid_phases)]
-    df_phases = df_phases[df_phases["phase_order"].isin(valid_phases)]
+    for row_idx, row in phases_features[
+        phases_features["phase_order"].isin(invalid_phases)
+    ].iterrows():
+        for col_idx in range(len(row)):
+            phases_features.iat[row_idx, col_idx] = 0
+            df_phases.iat[row_idx, col_idx] = 0
+
     df_phases = df_phases.drop(columns=["phase_order"])
-
     clustered_phases = phases_features["phase_order"].to_numpy()
 
     # Check if classifier model exists

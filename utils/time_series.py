@@ -27,7 +27,7 @@ def group_metric_by_month(dates, total_months, min_date, monotonic=True):
             dates_grouped.append((key, list(val)))
 
     time_series_cumulative_by_month = []
-    metric_counter = -1
+    metric_counter = 0
     dates_grouped_idx = 0
     grouped_months_count = len(dates_grouped)
     for month_idx in range(total_months):
@@ -53,10 +53,10 @@ def group_size_by_month(dates, size_values, total_months, min_date, monotonic=Tr
     if not dates:
         return []
 
+    values_by_date = {dates[i]: size_values[i] for i in range(len(dates))}
+
     dates_grouped = []
     dates.sort()
-
-    values_by_date = {dates[i]: size_values[i] for i in range(len(dates))}
 
     for key, val in groupby(dates, key=lambda date: group_util(date, min_date)):
         # Keep only months that are >= 0
@@ -64,7 +64,7 @@ def group_size_by_month(dates, size_values, total_months, min_date, monotonic=Tr
             dates_grouped.append((key, list(val)))
 
     time_series_cumulative_by_month = []
-    metric_counter = -1
+    metric_counter = 0
     dates_grouped_idx = 0
     grouped_months_count = len(dates_grouped)
     for month_idx in range(total_months):
@@ -75,10 +75,12 @@ def group_size_by_month(dates, size_values, total_months, min_date, monotonic=Tr
             month_counter = 0
             for month_date in dates_grouped[dates_grouped_idx][1]:
                 month_counter += values_by_date[month_date]
+
             if monotonic:
                 metric_counter += month_counter
             else:
                 metric_counter = month_counter
+
             dates_grouped_idx += 1
 
         time_series_cumulative_by_month.append(
