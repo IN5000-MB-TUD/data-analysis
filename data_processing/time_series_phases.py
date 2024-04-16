@@ -31,7 +31,6 @@ log = logging.getLogger(__name__)
 
 STATISTICAL_SETTINGS = ComprehensiveFCParameters()
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-N_PHASES = 5
 
 
 def extrapolate_phases_properties(metric_phases, metric_by_month):
@@ -186,9 +185,7 @@ if __name__ == "__main__":
                 metric_by_month = group_metric_by_month(
                     metric_dates, repository_age_months, repository_age_start
                 )
-                metric_phases_idxs = time_series_phases(
-                    metric_by_month, n_phases=N_PHASES
-                )
+                metric_phases_idxs = time_series_phases(metric_by_month)
                 time_series_phases_idxs[metric] = metric_phases_idxs
                 time_series_metrics_by_month[metric] = metric_by_month
 
@@ -210,10 +207,7 @@ if __name__ == "__main__":
                 repository_age_months,
                 repository_age_start,
             )
-            size_phases_idxs = time_series_phases(
-                size_by_month,
-                n_phases=N_PHASES,
-            )
+            size_phases_idxs = time_series_phases(size_by_month)
             time_series_phases_idxs["size"] = size_phases_idxs
             time_series_metrics_by_month["size"] = size_by_month
 
@@ -253,14 +247,13 @@ if __name__ == "__main__":
     model_type = "Hierarchical"  # clustering model
 
     # Clustering
-    max_clusters = phases_features["phase_order"].max()
     df_phases = phases_features.drop(columns=["phase_order"])
 
     # Check if model exists
     if not Path("../models/phases/mts_phases.pickle").exists():
         best_fit = float("inf")
         clusters = 2
-        for n_cluster in range(2, max_clusters):
+        for n_cluster in range(2, 5):
             model = ClusterWrapper(
                 n_clusters=n_cluster,
                 model_type=model_type,
@@ -274,7 +267,7 @@ if __name__ == "__main__":
             if labels_variance < best_fit:
                 best_fit = labels_variance
                 clusters = n_cluster
-        log.info(f"Optimal number of clusters is: {clusters}")
+        log.info(f"Optimal number of clusters is: {clusters}.")
 
         # Save model
         model = ClusterWrapper(
@@ -292,7 +285,7 @@ if __name__ == "__main__":
     clustered_phases = model.fit_predict(df_phases)
     phases_features["phase_order"] = clustered_phases
 
-    # Check if classifier model exists
+    # Check if classifier model exists, otherwise train one
     if not Path("../models/phases/mts_phases_classifier.pickle").exists():
         # Save classifier model
         train_knn_classifier(
@@ -300,6 +293,7 @@ if __name__ == "__main__":
         )
 
     # Store repository phases sequence per metric
+    max_clusters = phases_features["phase_order"].max()
     _prepare_repository_clustering_phases_files(
         repository_metrics_phases_count, phases_features, max_clusters
     )
