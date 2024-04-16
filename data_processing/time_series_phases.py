@@ -7,7 +7,6 @@ import joblib
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from sklearn.metrics import silhouette_score
 from tsfresh import extract_features
 from tsfresh.feature_extraction import ComprehensiveFCParameters
 
@@ -259,22 +258,23 @@ if __name__ == "__main__":
 
     # Check if model exists
     if not Path("../models/phases/mts_phases.pickle").exists():
-        best_fit = -1
-        clusters = 3
-        for n_cluster in range(3, max_clusters):
+        best_fit = float("inf")
+        clusters = 2
+        for n_cluster in range(2, max_clusters):
             model = ClusterWrapper(
                 n_clusters=n_cluster,
                 model_type=model_type,
                 transform_type=transform_type,
             )
             model.model.fit(df_phases)
-            cluster_score = silhouette_score(df_phases, model.model.labels_)
-            if cluster_score > best_fit:
-                best_fit = cluster_score
+
+            # Check cluster balance
+            _, labels_count = np.unique(model.model.labels_, return_counts=True)
+            labels_variance = np.var(labels_count)
+            if labels_variance < best_fit:
+                best_fit = labels_variance
                 clusters = n_cluster
-        log.info(
-            f"Optimal number of clusters is: {clusters} with silhouette_score: {best_fit}"
-        )
+        log.info(f"Optimal number of clusters is: {clusters}")
 
         # Save model
         model = ClusterWrapper(
@@ -291,26 +291,6 @@ if __name__ == "__main__":
     # Cluster repos
     clustered_phases = model.fit_predict(df_phases)
     phases_features["phase_order"] = clustered_phases
-    df_phases["phase_order"] = clustered_phases
-
-    # Cleanup outliers
-    phases_count = (
-        phases_features.groupby(["phase_order"]).size().reset_index(name="counts")
-    )
-    invalid_phases = []
-    for phase_idx, phase_count in enumerate(phases_count["counts"]):
-        if phase_count <= 5:
-            invalid_phases.append(phase_idx)
-
-    for row_idx, row in phases_features[
-        phases_features["phase_order"].isin(invalid_phases)
-    ].iterrows():
-        for col_idx in range(len(row)):
-            phases_features.iat[row_idx, col_idx] = 0
-            df_phases.iat[row_idx, col_idx] = 0
-
-    df_phases = df_phases.drop(columns=["phase_order"])
-    clustered_phases = phases_features["phase_order"].to_numpy()
 
     # Check if classifier model exists
     if not Path("../models/phases/mts_phases_classifier.pickle").exists():
