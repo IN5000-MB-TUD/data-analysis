@@ -33,25 +33,25 @@ STATISTICAL_SETTINGS = ComprehensiveFCParameters()
 DATE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
-def extrapolate_phases_properties(metric_phases, metric_by_month):
+def extrapolate_phases_properties(phases_idxs, data_by_month):
     """
     Extrapolate the given metric phases statistical properties.
 
-    :param metric_phases: The metric phases indexes.
-    :param metric_by_month: The metric values by month time series.
+    :param phases_idxs: The metric phases indexes.
+    :param data_by_month: The metric values by month time series.
     :return: The dataframe of the extracted features for the metric.
     """
     phases_time_series = []
     phase_idx_cumulative = 0
     timestamp_time_series = []
-    for phase_idx, phase in enumerate(metric_phases):
+    for phase_idx, phase in enumerate(phases_idxs):
         phases_time_series.extend([phase_idx + 1] * (phase - phase_idx_cumulative))
         timestamp_time_series.extend(list(range(0, (phase - phase_idx_cumulative))))
         phase_idx_cumulative = phase
 
     # Build data frame
     df_rows = []
-    for metric_idx, metric_data in enumerate(metric_by_month):
+    for metric_idx, metric_data in enumerate(data_by_month):
         if isinstance(metric_data, tuple):
             metric_value = metric_data[1]
         else:
@@ -72,7 +72,7 @@ def extrapolate_phases_properties(metric_phases, metric_by_month):
         .reset_index(level=0, drop=True)
     )
     df_metric = df_metric.fillna(0)
-    extracted_features = extract_features(
+    df_extracted_features = extract_features(
         df_metric,
         column_id="phase",
         column_sort="time",
@@ -83,58 +83,43 @@ def extrapolate_phases_properties(metric_phases, metric_by_month):
             "autocorrelation": STATISTICAL_SETTINGS["autocorrelation"],
         },
     )
-    extracted_features = extracted_features.fillna(0)
-    extracted_features = extracted_features.rename_axis("phase_order").reset_index()
+    df_extracted_features = df_extracted_features.fillna(0)
+    df_extracted_features = df_extracted_features.rename_axis(
+        "phase_order"
+    ).reset_index()
 
-    return extracted_features
+    return df_extracted_features
 
 
 def _prepare_repository_clustering_phases_files(
-    repository_metrics_phases_count, phases_features, max_clusters
+    metrics_phases_count, df_phases_features
 ):
     """
     Prepare files for the clustering script.
 
-    :param repository_metrics_phases_count: The phases count for each repository metric.
-    :param phases_features: The phases feature dataframe.
+    :param metrics_phases_count: The phases count for each repository metric.
+    :param df_phases_features: The phases feature dataframe.
     """
-    df_repository_phases_clustering_rows = []
     repository_metrics_phases = {}
     phases_rows_counter = 0
     for (
         repository_full_name,
         repository_metrics,
-    ) in repository_metrics_phases_count.items():
-        metrics_phases_sequence = {}
+    ) in metrics_phases_count.items():
         repository_metrics_phases[repository_full_name] = {}
-        for metric, metric_phases_count in repository_metrics.items():
-            repository_metrics_phases[repository_full_name][metric] = []
-            phases_average = 0
+        for metric_name, metric_phases_count in repository_metrics.items():
+            repository_metrics_phases[repository_full_name][metric_name] = []
             for i in range(0, metric_phases_count):
-                item_value = phases_features["phase_order"][phases_rows_counter + i]
-                phases_average += item_value
-                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = item_value
-                repository_metrics_phases[repository_full_name][metric].append(
+                item_value = df_phases_features["phase_order"][phases_rows_counter + i]
+                repository_metrics_phases[repository_full_name][metric_name].append(
                     int(item_value)
                 )
-
-                # Fill until max phases count with phases mean for the current metric
-            phases_average /= metric_phases_count
-            for i in range(metric_phases_count, max_clusters):
-                metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = phases_average
             phases_rows_counter += metric_phases_count
-        df_repository_phases_clustering_rows.append(metrics_phases_sequence)
 
-    df_repository_phases_clustering = pd.DataFrame(df_repository_phases_clustering_rows)
-    df_repository_phases_clustering["id"] = list(repository_metrics_phases_count.keys())
-    df_repository_phases_clustering = df_repository_phases_clustering.reindex(
-        sorted(df_repository_phases_clustering.columns), axis=1
-    )
-    df_repository_phases_clustering.to_csv(
-        "../data/time_series_clustering_phases.csv", index=False
-    )
-    with open("../data/repository_metrics_phases.json", "w") as outfile:
-        json.dump(repository_metrics_phases, outfile, indent=4)
+    with open(
+        "../data/repository_metrics_phases.json", "w"
+    ) as repository_metrics_phases_file:
+        json.dump(repository_metrics_phases, repository_metrics_phases_file, indent=4)
 
 
 if __name__ == "__main__":
@@ -293,10 +278,10 @@ if __name__ == "__main__":
         )
 
     # Store repository phases sequence per metric
-    max_clusters = phases_features["phase_order"].max()
-    _prepare_repository_clustering_phases_files(
-        repository_metrics_phases_count, phases_features, max_clusters
-    )
+    if not Path("../data/repository_metrics_phases.json").exists():
+        _prepare_repository_clustering_phases_files(
+            repository_metrics_phases_count, phases_features
+        )
 
     # Store polynomial coefficients
     phases_features = phases_features.groupby(["phase_order"]).mean()
@@ -307,7 +292,7 @@ if __name__ == "__main__":
     for idx, row in phases_features.iterrows():
         # Store phase properties
         mo.db["evolution_phases"].update_one(
-            {"phase_order": idx},
+            {"phase_id": idx},
             {"$set": row.to_dict()},
             upsert=True,
         )
@@ -320,7 +305,7 @@ if __name__ == "__main__":
             row[0],
         ]
         y = np.polyval(poly_coefficients, x)
-        plt.plot(x, y, label=f"Phase {idx + 1}")
+        plt.plot(x, y, label=f"Phase {idx}")
 
     plt.title(f"Repository Metrics Evolution Phases")
     plt.xlabel("Time (Months)")
