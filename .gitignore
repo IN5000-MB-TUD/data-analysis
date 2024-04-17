@@ -164,6 +164,7 @@ results
 plots
 data/time_series_data.csv
 data/time_series_phases.csv
+data/time_series_phases_probabilities.csv
 data/time_series_clustering_phases.csv
 data/time_series_clustering_distances.csv
 data/*.json

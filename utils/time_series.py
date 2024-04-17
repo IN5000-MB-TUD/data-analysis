@@ -135,6 +135,22 @@ def time_series_phases(
     return phases_break_points
 
 
+def get_phases_coefficients(evolution_phases):
+    """Retrieve the coefficients of the phases curve"""
+
+    phases_coefficients = {}
+    for phase in evolution_phases:
+        phases_coefficients[phase["phase_id"]] = {}
+        for key, value in phase.items():
+            if "coeff" in key:
+                coefficient_id = int(key.split("coeff_")[1][0])
+                phases_coefficients[phase["phase_id"]][
+                    f"coefficient_{coefficient_id}"
+                ] = value
+
+    return phases_coefficients
+
+
 def build_time_series(repository, max_count_key):
     """Build time series based on repository age and variable max value"""
     if repository[max_count_key] == 0:
