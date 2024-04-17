@@ -260,6 +260,11 @@ if __name__ == "__main__":
         log.info(f"{cluster}: {len(repos)} repositories")
         log.info("-----------------")
 
+    # Store repositories clusters
+    if not Path("../data/repository_clusters.json").exists():
+        with open("../data/repository_clusters.json", "w") as outfile:
+            json.dump(clusters_dict, outfile, indent=4)
+
     # Store clusters metrics curves coefficients
     df_clusters_coefficients = df_feats.filter(regex="_coeff_").copy()
     df_clusters_coefficients["cluster"] = clustered_repositories
