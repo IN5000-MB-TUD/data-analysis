@@ -316,6 +316,7 @@ if __name__ == "__main__":
     # Initialize settings
     h = FORECAST_HORIZON_MONTHS
     n_clusters = df_multi_time_series["cluster"].max() + 1
+    cluster_features_importance = {}
 
     # Train models by cluster group
     for cluster_id in range(n_clusters):
@@ -323,6 +324,8 @@ if __name__ == "__main__":
 
         models_path = f"../models/forecasting/cluster_{cluster_id}"
         Path(models_path).mkdir(parents=True, exist_ok=True)
+
+        cluster_features_importance[f"cluster_{cluster_id}"] = {}
 
         for feature_target, dynamic_features in TRAINING_SETTINGS.items():
             log.info(f"Train model for {feature_target} forecasting")
@@ -348,28 +351,17 @@ if __name__ == "__main__":
             metric_model_path = f"{models_path}/mts_forecast_{feature_target}.pickle"
 
             # Split dataset
-            idx_split = int(df_time_series["repository"].nunique() * 0.8)
             df_training = (
-                df_time_series.loc[df_time_series["repository"] < idx_split]
-                .drop(columns=["repository"])
-                .reset_index(drop=True)
-                .set_index(dynamic_features, append=True)
-            )
-            df_test = (
-                df_time_series.loc[df_time_series["repository"] >= idx_split]
-                .groupby("repository")
+                df_time_series.groupby("repository")
                 .head(-FORECAST_HORIZON_MONTHS)
                 .drop(columns=["repository"])
                 .reset_index(drop=True)
-                .set_index(dynamic_features, append=True)
             )
             df_validation = (
-                df_time_series.loc[df_time_series["repository"] >= idx_split]
-                .groupby("repository")
+                df_time_series.groupby("repository")
                 .tail(FORECAST_HORIZON_MONTHS)
                 .drop(columns=["repository"])
                 .reset_index(drop=True)
-                .set_index(dynamic_features, append=True)
             )
 
             # Setup the forecasting model
@@ -384,7 +376,7 @@ if __name__ == "__main__":
                 model = MLForecast(
                     models=models,
                     freq=1,
-                    lags=range(1, FORECAST_HORIZON_MONTHS + 1),
+                    lags=[1, FORECAST_HORIZON_MONTHS],
                 )
 
                 # Fit training data to the model
@@ -410,7 +402,7 @@ if __name__ == "__main__":
             log.info("Make predictions on validation set")
             predictions = model.predict(
                 h=h,
-                new_df=df_test,
+                X_df=df_validation.drop(columns=["y"]),
             )
             predictions = predictions.merge(
                 df_validation[["unique_id", "ds", "y"]],
@@ -426,11 +418,24 @@ if __name__ == "__main__":
             log.info(f"MSE: {model_mse}")
 
             # Plot time frames
-            fig = plot_series(df_test, predictions)
+            fig = plot_series(df_training, predictions)
             fig.show()
+
+            # Store the features importance of the model
+            cluster_features_importance[f"cluster_{cluster_id}"][feature_target] = (
+                pd.Series(
+                    model.models_["XGBRegressor"].feature_importances_,
+                    index=model.ts.features_order_,
+                )
+                .sort_values(ascending=False)
+                .to_dict()
+            )
 
             log.info("--------------")
 
         log.info("----------------------------\n")
+
+    # Print the features importance per cluster
+    log.info(cluster_features_importance)
 
     log.info("Multivariate time series forecasting completed!")
