@@ -435,7 +435,25 @@ if __name__ == "__main__":
 
         log.info("----------------------------\n")
 
-    # Print the features importance per cluster
-    log.info(cluster_features_importance)
+    # Process and print the features importance per cluster
+    cluster_metrics_importance = {}
+    for cluster, models in cluster_features_importance.items():
+        cluster_metrics_importance[cluster] = {}
+        for model, features in models.items():
+            filtered_dict = {
+                key: value for key, value in features.items() if "lag" not in key
+            }
+            normalize_factor = sum(filtered_dict.values())
+            if normalize_factor == 0:
+                normalize_factor = 1 / len(filtered_dict)
+            else:
+                normalize_factor = 1 / normalize_factor
+
+            for feature_key, feature_value in filtered_dict.items():
+                cluster_metrics_importance[cluster][feature_key] = (
+                    feature_value * normalize_factor
+                )
+
+    log.info(cluster_metrics_importance)
 
     log.info("Multivariate time series forecasting completed!")
