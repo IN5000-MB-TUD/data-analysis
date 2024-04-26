@@ -412,6 +412,17 @@ if __name__ == "__main__":
             forecast_horizon, ids=[REPOSITORY_FULL_NAME], X_df=df_time_series
         )
 
+        # Replay history
+        backwards_forecast_months = forecast_horizon * 2
+        df_replay = forecasting_model.cross_validation(
+            df_time_series,
+            n_windows=backwards_forecast_months,
+            h=1,
+            step_size=1,
+            refit=True,
+            fitted=True,
+        )
+
         # Evaluate forecasted phases
         history_metrics_values = df_time_series.head(-forecast_horizon)["y"].tolist()
         forecasted_metric_values = df_forecast["XGBRegressor"].tolist()
