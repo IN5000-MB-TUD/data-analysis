@@ -4,7 +4,6 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-from utilsforecast.plotting import plot_series
 
 from connection import mo
 from data_mining.repositories import update_github_repository_data
@@ -19,14 +18,34 @@ from utils.data import (
     get_metrics_information,
     get_metric_time_series,
     get_releases_time_series,
+    get_size_time_series,
 )
-from utils.main import normalize, proper_round
-from utils.time_series import group_metric_by_month, time_series_phases
+from utils.main import normalize
+from utils.time_series import (
+    group_metric_by_month,
+    time_series_phases,
+    group_size_by_month,
+)
 
 # Setup logging
 log = logging.getLogger(__name__)
 
 REPOSITORY_FULL_NAME = "saltstack/salt"
+SHOW_PLOTS = False
+METRICS = [
+    "stargazers",
+    "releases",
+    "commits",
+    "contributors",
+    "deployments",
+    "issues",
+    "forks",
+    "pull_requests",
+    "workflows",
+    "size",
+]
+PHASES_LABELS = ["Steep", "Shallow", "Plateau"]
+CLUSTERS_LABELS = ["Steep", "Semi-Shallow", "Shallow"]
 
 
 if __name__ == "__main__":
@@ -34,6 +53,12 @@ if __name__ == "__main__":
 
     # STEP 1: DATA COLLECTION
     log.info("STEP 1: DATA COLLECTION")
+
+    # Get all repos names
+    repository_names = list(
+        mo.db["repositories_data"].find(projection={"full_name": 1})
+    )
+
     # Check if the data in te DB exists. Otherwise, collect it.
     repository_url_split = REPOSITORY_FULL_NAME.split("/")
     repos_owner = repository_url_split[-2]
@@ -110,6 +135,26 @@ if __name__ == "__main__":
         "values": releases_by_month_values,
     }
 
+    (
+        repository_actions_dates,
+        repository_actions_total,
+        _,
+    ) = get_size_time_series(repository_db_record)
+    size_by_month = group_size_by_month(
+        repository_actions_dates,
+        repository_actions_total,
+        repository_age_months,
+        repository_age_start,
+    )
+    size_by_month_dates, size_by_month_values = zip(*size_by_month)
+    size_by_month_dates = list(size_by_month_dates)
+    size_by_month_values = list(size_by_month_values)
+
+    metrics_time_series["size"] = {
+        "dates": size_by_month_dates,
+        "values": size_by_month_values,
+    }
+
     for metric in get_metrics_information():
         metric_dates, _ = get_metric_time_series(
             repository_db_record,
@@ -133,17 +178,18 @@ if __name__ == "__main__":
         }
 
     # Plot metrics curves
-    for metric, metric_data in metrics_time_series.items():
-        log.info(f"Plotting metric {metric} curve")
-        metric_plot = create_plot(
-            "{} {}".format(metric, repository_db_record["full_name"]),
-            "Total: {}".format(metric_data["values"][-1]),
-            "Date",
-            "Count",
-            metric_data["dates"],
-            [metric_data["values"]],
-        )
-        metric_plot.show()
+    if SHOW_PLOTS:
+        for metric, metric_data in metrics_time_series.items():
+            log.info(f"Plotting metric {metric} curve")
+            metric_plot = create_plot(
+                "{} {}".format(metric, repository_db_record["full_name"]),
+                "Total: {}".format(metric_data["values"][-1]),
+                "Date",
+                "Count",
+                metric_data["dates"],
+                [metric_data["values"]],
+            )
+            metric_plot.show()
 
     log.info("---------------------------------------------------\n")
 
@@ -155,8 +201,7 @@ if __name__ == "__main__":
     for metric, metric_data in metrics_time_series.items():
         metric_phases_idxs = time_series_phases(
             metric_data["values"],
-            show_plot=True,
-            n_phases=5,
+            show_plot=SHOW_PLOTS,
             plot_title=f"{REPOSITORY_FULL_NAME} {metric}",
         )
         metrics_phases[metric] = {
@@ -164,6 +209,10 @@ if __name__ == "__main__":
             "phases_count": len(metric_phases_idxs),
             "phases_dates": [metric_data["dates"][i - 1] for i in metric_phases_idxs],
         }
+
+        log.info(
+            f"{metric} {metrics_phases[metric]['phases_count']} phases breakpoints: {metrics_phases[metric]['phases']}, {metrics_phases[metric]['phases_dates']}"
+        )
 
     log.info("Extrapolating metrics time series phases statistical properties...")
     phases_features = pd.DataFrame()
@@ -198,43 +247,62 @@ if __name__ == "__main__":
     phases_rows_counter = 0
     for metric, metric_phases_data in metrics_phases.items():
         metrics_phases[metric]["phases_sequence"] = []
+        metrics_phases[metric]["phases_sequence_label"] = []
         for i in range(0, metric_phases_data["phases_count"]):
-            metrics_phases[metric]["phases_sequence"].append(
-                phases_features["phase_cluster"][phases_rows_counter + i]
+            phase_id = phases_features["phase_cluster"][phases_rows_counter + i]
+            metrics_phases[metric]["phases_sequence"].append(phase_id)
+            metrics_phases[metric]["phases_sequence_label"].append(
+                PHASES_LABELS[phase_id]
             )
 
-        metrics_phases[metric]["phases_average"] = (
-            sum(metrics_phases[metric]["phases_sequence"])
-            / metric_phases_data["phases_count"]
-        )
         phases_rows_counter += metric_phases_data["phases_count"]
 
-        log.info(
-            f"Phases sequence for metric {metric}: {metrics_phases[metric]['phases_sequence']}"
+        log_sequences = list(
+            zip(
+                [
+                    segment_date.strftime("%d/%m/%Y")
+                    for segment_date in metrics_phases[metric]["phases_dates"]
+                ],
+                metrics_phases[metric]["phases_sequence_label"],
+            )
         )
+
+        log.info(f"Phases sequence for metric {metric}: {log_sequences}")
 
     log.info("---------------------------------------------------\n")
 
     # STEP 4: REPOSITORY CLUSTERING
     log.info("STEP 3: REPOSITORY CLUSTERING")
 
+    # Retrieve phases from database
+    evolution_phases = mo.db["evolution_phases"].find(
+        projection={"_id": 0, "phase_name": 0}
+    )
+    phases_statistical_properties = {}
+    for phase in evolution_phases:
+        phases_statistical_properties[f"phase_{phase['phase_id']}"] = phase
+        del phases_statistical_properties[f"phase_{phase['phase_id']}"]["phase_id"]
+
     log.info("Building cluster vector...")
 
     log.info("Process metrics phases sequences...")
-    max_phases = 6
     metrics_phases_sequence = {}
-    for metric, metric_phases_data in metrics_phases.items():
-        for i in range(0, max_phases):
-            if i < metric_phases_data["phases_count"]:
-                item_value = metrics_phases[metric]["phases_sequence"][i]
-            else:
-                item_value = metrics_phases[metric]["phases_average"]
-            metrics_phases_sequence[f"metric_{metric}_phase_{i}"] = item_value
+
+    for metric in METRICS:
+        metric_phases_data = metrics_phases[metric]
+        metric_phases_rows = []
+        for phase in metric_phases_data["phases_sequence"]:
+            row_dict = {
+                f"{metric}_{key}": value
+                for key, value in phases_statistical_properties[
+                    f"phase_{phase}"
+                ].items()
+            }
+            metric_phases_rows.append(row_dict)
+        metric_phases_df = pd.DataFrame(metric_phases_rows)
+        metrics_phases_sequence.update(**metric_phases_df.mean().to_dict())
 
     df_repository_phases_clustering = pd.DataFrame([metrics_phases_sequence])
-    df_repository_phases_clustering = df_repository_phases_clustering.reindex(
-        sorted(df_repository_phases_clustering.columns), axis=1
-    )
 
     log.info("Compute pattern distance between metrics...")
     metrics_values_pairs = []
@@ -263,7 +331,19 @@ if __name__ == "__main__":
     )
 
     clustered_repository = repos_clustering_model.predict(df_feats)
-    log.info(f"The repository was assigned to cluster {clustered_repository}")
+    cluster_id = clustered_repository[0]
+    log.info(f"The repository was assigned to cluster {CLUSTERS_LABELS[cluster_id]}")
+
+    # Get most similar projects
+    log.info("Most similar projects:")
+    nearest_projects = repos_clustering_model.kneighbors(
+        df_feats, return_distance=False
+    )
+    for point_results in nearest_projects:
+        for projects_idx in point_results:
+            project_name = repository_names[projects_idx]["full_name"]
+            if project_name != REPOSITORY_FULL_NAME:
+                log.info(project_name)
 
     log.info("---------------------------------------------------\n")
 
@@ -284,6 +364,8 @@ if __name__ == "__main__":
             "forks",
             "pull_requests",
             "workflows",
+            "releases",
+            "size",
         ],
     )
 
@@ -292,16 +374,26 @@ if __name__ == "__main__":
     for metric, metric_data in metrics_time_series.items():
         df_multi_time_series[metric] = metric_data["values"]
 
+    # Scale values between min and max
+    metrics_columns = df_multi_time_series.columns.difference(["ds", "unique_id"])
+    df_multi_time_series[metrics_columns] = (
+        df_multi_time_series[metrics_columns]
+        .apply(lambda v: (v - v.min()) / (v.max() - v.min()))
+        .reset_index(level=0, drop=True)
+    )
+    df_multi_time_series = df_multi_time_series.fillna(0)
+
     # Set the months to forecast
     forecast_horizon = 12
+    models_path = f"../models/forecasting/cluster_{cluster_id}"
 
     for feature_target, dynamic_features in TRAINING_SETTINGS.items():
+        metric_model_path = f"{models_path}/mts_forecast_{feature_target}.pickle"
+
         # Check if model exists
-        if not Path(
-            f"../models/forecasting/mts_forecast_{feature_target}.pickle"
-        ).exists():
+        if not Path(metric_model_path).exists():
             log.warning(
-                f"The {feature_target} forecasting model not exists in the /models/forecasting folder."
+                f"The {feature_target} forecasting model not exists in the /models/forecasting/cluster_{cluster_id} folder."
                 "Run the data_processing/time_series_forecasting.py script to create it."
             )
             continue
@@ -309,28 +401,39 @@ if __name__ == "__main__":
         log.info(f"Forecasting for {feature_target} metric...")
 
         # Load the model
-        forecasting_model = joblib.load(
-            f"../models/forecasting/mts_forecast_{feature_target}.pickle"
-        )
+        forecasting_model = joblib.load(metric_model_path)
 
         # Build the data frames
-        df_time_series = (
-            df_multi_time_series.rename(columns={feature_target: "y"})
-            .reset_index(drop=True)
-            .set_index(dynamic_features, append=True)
-        )
+        df_time_series = df_multi_time_series.rename(
+            columns={feature_target: "y"}
+        ).reset_index(drop=True)
+
+        # Split dataset
+        df_training = df_time_series.head(-forecast_horizon).reset_index(drop=True)
+        df_validation = df_time_series.tail(forecast_horizon).reset_index(drop=True)
 
         # Forecast values
-        df_forecast = forecasting_model.predict(
+        forecasting_model.fit(
+            df_training,
+            id_col="unique_id",
+            time_col="ds",
+            target_col="y",
+            static_features=[],
+        )
+        predictions = forecasting_model.predict(
             h=forecast_horizon,
-            new_df=df_time_series,
-        ).merge(
-            df_time_series[["unique_id", "ds", "y"]], on=["unique_id", "ds"], how="left"
+            X_df=df_validation.drop(columns=["y"]),
+        )
+        df_forecast = predictions.merge(
+            df_validation[["unique_id", "ds", "y"]],
+            on=["unique_id", "ds"],
+            how="left",
         )
 
         # Evaluate forecasted phases
+        history_metrics_values = df_training["y"].tolist()
         forecasted_metric_values = df_forecast["XGBRegressor"].tolist()
-        forecasted_metric_values = list(map(proper_round, forecasted_metric_values))
+        # forecasted_metric_values = list(map(proper_round, forecasted_metric_values))
         forecasted_metric_phases = time_series_phases(forecasted_metric_values)
         df_forecasted_metric_phases_features = extrapolate_phases_properties(
             forecasted_metric_phases, forecasted_metric_values
@@ -344,26 +447,22 @@ if __name__ == "__main__":
         )
 
         log.info(f"Plotting forecasted curve for metric {feature_target}...\n")
-        full_months = list(
-            range(len(metrics_time_series[feature_target]["dates"]) + forecast_horizon)
-        )
-        full_values = (
-            metrics_time_series[feature_target]["values"] + forecasted_metric_values
-        )
+        full_months = list(range(len(metrics_time_series[feature_target]["dates"])))
+        full_values = history_metrics_values + forecasted_metric_values
         forecast_metric_plot = create_plot(
             "Forecasted {} {}".format(
                 feature_target, repository_db_record["full_name"]
             ),
             "Total: {} -> {}".format(
-                metrics_time_series[feature_target]["values"][-1], full_values[-1]
+                round(history_metrics_values[-1], 4), round(full_values[-1], 4)
             ),
             "Date",
             "Count",
             full_months,
-            [full_values],
+            [full_values, df_time_series["y"].tolist()],
         )
         forecast_metric_plot.axvline(
-            x=len(metrics_time_series[feature_target]["dates"]),
+            x=len(history_metrics_values),
             color="g",
             label="axvline - full height",
         )
