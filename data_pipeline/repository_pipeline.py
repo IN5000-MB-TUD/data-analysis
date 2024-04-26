@@ -408,32 +408,13 @@ if __name__ == "__main__":
             columns={feature_target: "y"}
         ).reset_index(drop=True)
 
-        # Split dataset
-        df_training = df_time_series.head(-forecast_horizon).reset_index(drop=True)
-        df_validation = df_time_series.tail(forecast_horizon).reset_index(drop=True)
-
-        # Forecast values
-        forecasting_model.fit(
-            df_training,
-            id_col="unique_id",
-            time_col="ds",
-            target_col="y",
-            static_features=[],
-        )
-        predictions = forecasting_model.predict(
-            h=forecast_horizon,
-            X_df=df_validation.drop(columns=["y"]),
-        )
-        df_forecast = predictions.merge(
-            df_validation[["unique_id", "ds", "y"]],
-            on=["unique_id", "ds"],
-            how="left",
+        df_forecast = forecasting_model.predict(
+            forecast_horizon, ids=[REPOSITORY_FULL_NAME], X_df=df_time_series
         )
 
         # Evaluate forecasted phases
-        history_metrics_values = df_training["y"].tolist()
+        history_metrics_values = df_time_series.head(-forecast_horizon)["y"].tolist()
         forecasted_metric_values = df_forecast["XGBRegressor"].tolist()
-        # forecasted_metric_values = list(map(proper_round, forecasted_metric_values))
         forecasted_metric_phases = time_series_phases(forecasted_metric_values)
         df_forecasted_metric_phases_features = extrapolate_phases_properties(
             forecasted_metric_phases, forecasted_metric_values
@@ -443,7 +424,7 @@ if __name__ == "__main__":
             df_forecasted_metric_phases_features.drop(columns=["phase_order"])
         )
         log.info(
-            f"The forecasted phases for the metric {feature_target} in the next {forecast_horizon} months are: {forecasted_clustered_phases}"
+            f"The forecasted phases for the metric {feature_target} in the next {forecast_horizon} months are: {[PHASES_LABELS[phase_id] for phase_id in forecasted_clustered_phases]}"
         )
 
         log.info(f"Plotting forecasted curve for metric {feature_target}...\n")
