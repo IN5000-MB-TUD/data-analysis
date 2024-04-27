@@ -269,10 +269,19 @@ if __name__ == "__main__":
 
         log.info(f"Phases sequence for metric {metric}: {log_sequences}")
 
+    # Build unique representation curve for repository evolution history
+    phases_idxs = set()
+    phases_idxs.add(0)
+    for metric, metric_phases_data in metrics_phases.items():
+        phases_idxs.update(metric_phases_data["phases"])
+    phases_idxs = list(phases_idxs)
+    phases_idxs.sort()
+    phases_bounds = list(zip(phases_idxs[:-1], phases_idxs[1:]))
+
     log.info("---------------------------------------------------\n")
 
     # STEP 4: REPOSITORY CLUSTERING
-    log.info("STEP 3: REPOSITORY CLUSTERING")
+    log.info("STEP 4: REPOSITORY CLUSTERING")
 
     # Retrieve phases from database
     evolution_phases = mo.db["evolution_phases"].find(
@@ -438,26 +447,27 @@ if __name__ == "__main__":
             f"The forecasted phases for the metric {feature_target} in the next {forecast_horizon} months are: {[PHASES_LABELS[phase_id] for phase_id in forecasted_clustered_phases]}"
         )
 
-        log.info(f"Plotting forecasted curve for metric {feature_target}...\n")
-        full_months = list(range(len(metrics_time_series[feature_target]["dates"])))
-        full_values = history_metrics_values + forecasted_metric_values
-        forecast_metric_plot = create_plot(
-            "Forecasted {} {}".format(
-                feature_target, repository_db_record["full_name"]
-            ),
-            "Total: {} -> {}".format(
-                round(history_metrics_values[-1], 4), round(full_values[-1], 4)
-            ),
-            "Date",
-            "Count",
-            full_months,
-            [full_values, df_time_series["y"].tolist()],
-        )
-        forecast_metric_plot.axvline(
-            x=len(history_metrics_values),
-            color="g",
-            label="axvline - full height",
-        )
-        forecast_metric_plot.show()
+        if SHOW_PLOTS:
+            log.info(f"Plotting forecasted curve for metric {feature_target}...\n")
+            full_months = list(range(len(metrics_time_series[feature_target]["dates"])))
+            full_values = history_metrics_values + forecasted_metric_values
+            forecast_metric_plot = create_plot(
+                "Forecasted {} {}".format(
+                    feature_target, repository_db_record["full_name"]
+                ),
+                "Total: {} -> {}".format(
+                    round(history_metrics_values[-1], 4), round(full_values[-1], 4)
+                ),
+                "Date",
+                "Count",
+                full_months,
+                [full_values, df_time_series["y"].tolist()],
+            )
+            forecast_metric_plot.axvline(
+                x=len(history_metrics_values),
+                color="g",
+                label="axvline - full height",
+            )
+            forecast_metric_plot.show()
 
     log.info("---------------------------------------------------\n")
