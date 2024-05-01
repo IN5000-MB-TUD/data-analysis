@@ -1,7 +1,12 @@
+import logging
+
 import joblib
 import numpy as np
 from sklearn.model_selection import cross_val_score
 from sklearn.neighbors import KNeighborsClassifier
+
+# Setup logging
+log = logging.getLogger(__name__)
 
 
 def train_knn_classifier(X, y, model_path="", max_k=10, cross_validation_size=5):
@@ -27,6 +32,8 @@ def train_knn_classifier(X, y, model_path="", max_k=10, cross_validation_size=5)
         score = cross_val_score(knn, X, y, cv=cross_validation_size)
         scores.append(np.mean(score))
 
+    log.info("KNN classifier scores: {}".format(scores))
+
     # Find the best k
     best_k = np.argmax(scores) + 1
 
@@ -37,5 +44,7 @@ def train_knn_classifier(X, y, model_path="", max_k=10, cross_validation_size=5)
         knn_model,
         model_path,
     )
+
+    log.info("Trained KNN classifier with {} neighbors".format(best_k))
 
     return knn_model

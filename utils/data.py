@@ -35,6 +35,61 @@ def get_stargazers_time_series(repository):
     return stargazers, stargazers_cumulative
 
 
+def get_releases_time_series(repository):
+    """Get repository releases time series"""
+    repository_releases = repository["releases"]
+    if repository_releases is None:
+        repository_releases = {}
+
+    releases_dates = [repository["created_at"]] + [
+        release["created_at"] for release in repository_releases.values()
+    ]
+    releases_dates.sort()
+    releases_cumulative = [0]
+    releases_counter = 0
+    for i in range(1, len(releases_dates)):
+        releases_counter += 1
+        releases_cumulative.append(releases_counter)
+
+    releases_cumulative.append(releases_counter)
+    releases_dates.append(repository["metadata"]["modified"])
+
+    return releases_dates, releases_cumulative
+
+
+def get_size_time_series(repository):
+    """Get repository size time series"""
+    repository_size = mo.db["statistics_size"].find_one(
+        {"repository_id": repository["_id"]}
+    )
+    if not repository_size:
+        return [], [], []
+
+    repository_size_dates = [repository["created_at"]]
+    repository_size_cumulative_total = [0]
+    repository_size_cumulative_difference = [0]
+    size_total_counter = 0
+    size_difference_counter = 0
+    for size_action in repository_size["size"].values():
+        size_total_counter += size_action["total"]
+        repository_size_cumulative_total.append(size_total_counter)
+
+        size_difference_counter += size_action["size"]
+        repository_size_cumulative_difference.append(size_difference_counter)
+
+        repository_size_dates.append(size_action["date"])
+
+    repository_size_cumulative_total.append(size_total_counter)
+    repository_size_cumulative_difference.append(size_difference_counter)
+    repository_size_dates.append(repository["metadata"]["modified"])
+
+    return (
+        repository_size_dates,
+        repository_size_cumulative_total,
+        repository_size_cumulative_difference,
+    )
+
+
 def get_metric_time_series(
     repository, metric_collection, metric_name, date_field, total_value=None
 ):

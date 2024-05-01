@@ -79,10 +79,8 @@ cd data_processing
 
 # Cluster repositories based on their metrics phases and metrics patterns similarity
 # The clustering model is saved in the models/clustering folder
+# The average curves of each cluster metrics are plotted
 python time_series_clustering.py
-
-# Plot the average metrics curves for each cluster
-python time_series_clustering_plot.py
 ```
 
 #### Multi-Variate Time Series Forecasting

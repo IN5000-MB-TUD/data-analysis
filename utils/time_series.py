@@ -6,13 +6,16 @@ import ruptures as rpt
 from dateutil.relativedelta import relativedelta
 from matplotlib import pyplot as plt
 from pytz import utc
+from ruptures.exceptions import BadSegmentationParameters
+
+from utils.main import normalize
 
 
 def group_util(date, min_date):
     return (date - min_date).days // 31
 
 
-def group_metric_by_month(dates, total_months, min_date):
+def group_metric_by_month(dates, total_months, min_date, monotonic=True):
     """Group given list of dates by month."""
     if not dates:
         return []
@@ -26,7 +29,7 @@ def group_metric_by_month(dates, total_months, min_date):
             dates_grouped.append((key, list(val)))
 
     time_series_cumulative_by_month = []
-    metric_counter = -1
+    metric_counter = 0
     dates_grouped_idx = 0
     grouped_months_count = len(dates_grouped)
     for month_idx in range(total_months):
@@ -34,7 +37,10 @@ def group_metric_by_month(dates, total_months, min_date):
             dates_grouped_idx < grouped_months_count
             and month_idx == dates_grouped[dates_grouped_idx][0]
         ):
-            metric_counter += len(dates_grouped[dates_grouped_idx][1])
+            if monotonic:
+                metric_counter += len(dates_grouped[dates_grouped_idx][1])
+            else:
+                metric_counter = len(dates_grouped[dates_grouped_idx][1])
             dates_grouped_idx += 1
 
         time_series_cumulative_by_month.append(
@@ -44,7 +50,51 @@ def group_metric_by_month(dates, total_months, min_date):
     return time_series_cumulative_by_month
 
 
-def time_series_phases(time_series, show_plot=False):
+def group_size_by_month(dates, size_values, total_months, min_date, monotonic=True):
+    """Group given list of size metric dates and values by month."""
+    if not dates:
+        return []
+
+    values_by_date = {dates[i]: size_values[i] for i in range(len(dates))}
+
+    dates_grouped = []
+    dates.sort()
+
+    for key, val in groupby(dates, key=lambda date: group_util(date, min_date)):
+        # Keep only months that are >= 0
+        if key >= 0:
+            dates_grouped.append((key, list(val)))
+
+    time_series_cumulative_by_month = []
+    metric_counter = 0
+    dates_grouped_idx = 0
+    grouped_months_count = len(dates_grouped)
+    for month_idx in range(total_months):
+        if (
+            dates_grouped_idx < grouped_months_count
+            and month_idx == dates_grouped[dates_grouped_idx][0]
+        ):
+            month_counter = 0
+            for month_date in dates_grouped[dates_grouped_idx][1]:
+                month_counter += values_by_date[month_date]
+
+            if monotonic:
+                metric_counter += month_counter
+            else:
+                metric_counter = month_counter
+
+            dates_grouped_idx += 1
+
+        time_series_cumulative_by_month.append(
+            (min_date + relativedelta(months=month_idx), metric_counter)
+        )
+
+    return time_series_cumulative_by_month
+
+
+def time_series_phases(
+    time_series, show_plot=False, n_phases=None, window_size=12, plot_title=""
+):
     if not time_series:
         return []
 
@@ -54,21 +104,98 @@ def time_series_phases(time_series, show_plot=False):
     else:
         time_series_np = np.array(time_series, dtype="int")
 
+    # Setup Window model with L2 cost function
     model = "l2"  # "l1", "rbf", "linear", "normal", "ar"
+    algo = rpt.Window(
+        width=min(window_size, time_series_np.shape[0] - 1), model=model
+    ).fit(time_series_np)
+
     pen = np.log(time_series_np.shape[0]) * 1 * time_series_np.std() ** 2
 
-    algo = rpt.Window(width=min(12, time_series_np.shape[0] - 1), model=model).fit(
-        time_series_np
-    )
-    phases_break_points = algo.predict(pen=pen)
+    # Predict break points based on the given n_phases.
+    if n_phases is None:
+        phases_break_points = algo.predict(pen=pen)
+    else:
+        try:
+            phases_break_points = algo.predict(n_bkps=n_phases - 1)
+        except BadSegmentationParameters:
+            phases_break_points = algo.predict(pen=pen)
 
     if show_plot:
-        rpt.show.display(
+        fig, axarr = rpt.show.display(
             time_series_np, phases_break_points, phases_break_points, figsize=(10, 6)
         )
+
+        if fig and axarr:
+            fig.tight_layout(pad=2)
+            axarr[0].set_title(f"{plot_title} phases")
+            axarr[0].set_xlabel("Month")
+            axarr[0].set_ylabel("Count")
+
         plt.show()
 
     return phases_break_points
+
+
+def get_phases_coefficients(evolution_phases):
+    """Retrieve the coefficients of the phases curve"""
+
+    phases_coefficients = {}
+    for phase in evolution_phases:
+        phases_coefficients[phase["phase_id"]] = {}
+        for key, value in phase.items():
+            if "coeff" in key:
+                coefficient_id = int(key.split("coeff_")[1][0])
+                phases_coefficients[phase["phase_id"]][
+                    f"coefficient_{coefficient_id}"
+                ] = value
+
+    return phases_coefficients
+
+
+def merge_time_series_patterns(
+    metrics,
+    patterns_weights,
+    metrics_time_series,
+    metrics_phases_aligned,
+    phases_bounds,
+):
+    """Merge time series based on the detected patterns"""
+    unique_time_series = []
+    for metric_1 in [metrics[0]]:
+        time_series_1 = normalize(metrics_time_series[metric_1]["values"], 0, 1)
+        weights_1 = [patterns_weights[w] for w in metrics_phases_aligned[metric_1]]
+        merged_time_series = []
+        merged_weights = []
+        for metric_2 in metrics[1:]:
+            # Initialize values
+            time_series_2 = normalize(metrics_time_series[metric_2]["values"], 0, 1)
+            weights_2 = [patterns_weights[w] for w in metrics_phases_aligned[metric_2]]
+
+            # Merge the time series
+            for bound_idx, (bound_start, bound_end) in enumerate(phases_bounds):
+                segment_1 = time_series_1[bound_start:bound_end]
+                segment_2 = time_series_2[bound_start:bound_end]
+                segment_average = [
+                    (s_1 + s_2) / 2 for s_1, s_2 in zip(segment_1, segment_2)
+                ]
+                segment_rise = abs(segment_average[-1] - segment_average[0])
+
+                weight_1 = weights_1[bound_idx]
+                weight_2 = weights_2[bound_idx]
+                weight_average = weight_1 * weight_2 / (1 + segment_rise)
+
+                merged_weights.extend([weight_average for _ in segment_average])
+                merged_time_series.extend([weight_average * x for x in segment_average])
+
+            merged_time_series = normalize(merged_time_series, 0, 1)
+            time_series_1 = merged_time_series
+            weights_1 = merged_weights
+            merged_time_series = []
+            merged_weights = []
+        unique_time_series = time_series_1
+
+    return unique_time_series
 
 
 def build_time_series(repository, max_count_key):
