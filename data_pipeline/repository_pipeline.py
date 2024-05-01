@@ -317,6 +317,7 @@ if __name__ == "__main__":
             metric_plot.axvline(
                 x=phase_idx,
                 color="g",
+                ls="--",
             )
 
         metric_plot.show()
