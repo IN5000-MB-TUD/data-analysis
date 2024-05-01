@@ -25,6 +25,7 @@ from utils.time_series import (
     group_metric_by_month,
     time_series_phases,
     group_size_by_month,
+    merge_time_series_patterns,
 )
 
 # Setup logging
@@ -46,6 +47,7 @@ METRICS = [
 ]
 PHASES_LABELS = ["Steep", "Shallow", "Plateau"]
 CLUSTERS_LABELS = ["Steep", "Semi-Shallow", "Shallow"]
+PATTERNS_WEIGHTS = [0.5, 0.35, 0.15]
 
 
 if __name__ == "__main__":
@@ -271,12 +273,71 @@ if __name__ == "__main__":
 
     # Build unique representation curve for repository evolution history
     phases_idxs = set()
-    phases_idxs.add(0)
+
     for metric, metric_phases_data in metrics_phases.items():
         phases_idxs.update(metric_phases_data["phases"])
     phases_idxs = list(phases_idxs)
     phases_idxs.sort()
+
+    metrics_phases_aligned = {}
+    for metric, metric_stats in metrics_phases.items():
+        metrics_phases_aligned[metric] = []
+        pattern_idx = 0
+        for phase_idx in phases_idxs:
+            if phase_idx > metric_stats["phases"][pattern_idx]:
+                pattern_idx += 1
+
+            metrics_phases_aligned[metric].append(
+                metric_stats["phases_sequence"][pattern_idx]
+            )
+
+    phases_idxs = [0] + phases_idxs
     phases_bounds = list(zip(phases_idxs[:-1], phases_idxs[1:]))
+
+    unique_time_series = merge_time_series_patterns(
+        METRICS,
+        PATTERNS_WEIGHTS,
+        metrics_time_series,
+        metrics_phases_aligned,
+        phases_bounds,
+    )
+
+    if SHOW_PLOTS:
+        log.info(f"Plotting metric merged curve")
+        metric_plot = create_plot(
+            "Merged Time Series",
+            "",
+            "Month",
+            "Trend",
+            list(range(len(unique_time_series))),
+            [unique_time_series],
+        )
+
+        for phase_idx in phases_idxs[1:-1]:
+            metric_plot.axvline(
+                x=phase_idx,
+                color="g",
+            )
+
+        metric_plot.show()
+
+    # Map merged time series to phases
+    unique_time_series_features = extrapolate_phases_properties(
+        phases_idxs[1:], unique_time_series
+    )
+    df_unique_time_series_phases = unique_time_series_features.drop(
+        columns=["phase_order"]
+    )
+    unique_time_series_phases = phases_clustering_model.predict(
+        df_unique_time_series_phases
+    )
+
+    merged_phases_sequence = [
+        PHASES_LABELS[pattern_id] for pattern_id in unique_time_series_phases
+    ]
+    log.info(
+        f"Merged phases sequence for {REPOSITORY_FULL_NAME}: {merged_phases_sequence}"
+    )
 
     log.info("---------------------------------------------------\n")
 

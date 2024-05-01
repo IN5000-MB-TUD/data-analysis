@@ -8,6 +8,8 @@ from matplotlib import pyplot as plt
 from pytz import utc
 from ruptures.exceptions import BadSegmentationParameters
 
+from utils.main import normalize
+
 
 def group_util(date, min_date):
     return (date - min_date).days // 31
@@ -149,6 +151,51 @@ def get_phases_coefficients(evolution_phases):
                 ] = value
 
     return phases_coefficients
+
+
+def merge_time_series_patterns(
+    metrics,
+    patterns_weights,
+    metrics_time_series,
+    metrics_phases_aligned,
+    phases_bounds,
+):
+    """Merge time series based on the detected patterns"""
+    unique_time_series = []
+    for metric_1 in [metrics[0]]:
+        time_series_1 = normalize(metrics_time_series[metric_1]["values"], 0, 1)
+        weights_1 = [patterns_weights[w] for w in metrics_phases_aligned[metric_1]]
+        merged_time_series = []
+        merged_weights = []
+        for metric_2 in metrics[1:]:
+            # Initialize values
+            time_series_2 = normalize(metrics_time_series[metric_2]["values"], 0, 1)
+            weights_2 = [patterns_weights[w] for w in metrics_phases_aligned[metric_2]]
+
+            # Merge the time series
+            for bound_idx, (bound_start, bound_end) in enumerate(phases_bounds):
+                segment_1 = time_series_1[bound_start:bound_end]
+                segment_2 = time_series_2[bound_start:bound_end]
+                segment_average = [
+                    (s_1 + s_2) / 2 for s_1, s_2 in zip(segment_1, segment_2)
+                ]
+                segment_rise = abs(segment_average[-1] - segment_average[0])
+
+                weight_1 = weights_1[bound_idx]
+                weight_2 = weights_2[bound_idx]
+                weight_average = weight_1 * weight_2 / (1 + segment_rise)
+
+                merged_weights.extend([weight_average for _ in segment_average])
+                merged_time_series.extend([weight_average * x for x in segment_average])
+
+            merged_time_series = normalize(merged_time_series, 0, 1)
+            time_series_1 = merged_time_series
+            weights_1 = merged_weights
+            merged_time_series = []
+            merged_weights = []
+        unique_time_series = time_series_1
+
+    return unique_time_series
 
 
 def build_time_series(repository, max_count_key):
