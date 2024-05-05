@@ -47,7 +47,7 @@ METRICS = [
 ]
 PHASES_LABELS = ["Steep", "Shallow", "Plateau"]
 CLUSTERS_LABELS = ["Steep", "Semi-Shallow", "Shallow"]
-PATTERNS_WEIGHTS = [0.5, 0.35, 0.15]
+PATTERNS_WEIGHTS = [0.33, 0.33, 0.33]
 
 
 if __name__ == "__main__":
@@ -302,7 +302,7 @@ if __name__ == "__main__":
         phases_bounds,
     )
 
-    if SHOW_PLOTS:
+    if True or SHOW_PLOTS:
         log.info(f"Plotting metric merged curve")
         metric_plot = create_plot(
             "Merged Time Series",
@@ -331,6 +331,21 @@ if __name__ == "__main__":
     )
     unique_time_series_phases = phases_clustering_model.predict(
         df_unique_time_series_phases
+    )
+
+    phases_bounds_dates = []
+    for bound_start, bound_end in phases_bounds:
+        if bound_start == 0:
+            date_start = repository_age_start
+        else:
+            date_start = metrics_time_series["stargazers"]["dates"][bound_start - 1]
+
+        date_end = metrics_time_series["stargazers"]["dates"][bound_end - 1]
+        phases_bounds_dates.append(
+            (date_start.strftime("%d/%m/%Y"), date_end.strftime("%d/%m/%Y"))
+        )
+    log.info(
+        f"Phases bounds for {REPOSITORY_FULL_NAME}: {[f'{a} - {b}' for a, b in phases_bounds_dates]}"
     )
 
     merged_phases_sequence = [
