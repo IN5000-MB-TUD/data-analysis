@@ -1,5 +1,6 @@
 import os
 import itertools
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -48,6 +49,7 @@ def extract_single_series_features_batch(
 
     curr_dir = os.path.dirname(os.path.abspath(__file__))
     curr_dir = os.path.join(curr_dir, "../checkpoint/")
+    Path(curr_dir).mkdir(parents=True, exist_ok=True)
     # print('Start univariate feature extraction in batch : pid {}'.format(pid))
     for i in range(num_batch):
         a = i * batch_size
