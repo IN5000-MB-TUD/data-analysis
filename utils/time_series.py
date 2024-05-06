@@ -179,11 +179,10 @@ def merge_time_series_patterns(
                 segment_average = [
                     (s_1 + s_2) / 2 for s_1, s_2 in zip(segment_1, segment_2)
                 ]
-                segment_rise = abs(segment_average[-1] - segment_average[0])
 
                 weight_1 = weights_1[bound_idx]
                 weight_2 = weights_2[bound_idx]
-                weight_average = weight_1 * weight_2 / (1 + segment_rise)
+                weight_average = (weight_1 + weight_2) / 2
 
                 merged_weights.extend([weight_average for _ in segment_average])
                 merged_time_series.extend([weight_average * x for x in segment_average])

@@ -165,6 +165,7 @@ plots
 data/time_series_data.csv
 data/time_series_phases.csv
 data/time_series_phases_probabilities.csv
+data/bi_grams_probability_table.csv
 data/time_series_clustering.csv
 data/time_series_clustering_phases_coefficients.csv
 data/*.json
