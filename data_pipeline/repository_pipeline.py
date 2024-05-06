@@ -302,7 +302,7 @@ if __name__ == "__main__":
         phases_bounds,
     )
 
-    if True or SHOW_PLOTS:
+    if SHOW_PLOTS:
         log.info(f"Plotting metric merged curve")
         metric_plot = create_plot(
             "Merged Time Series",
@@ -510,7 +510,6 @@ if __name__ == "__main__":
         )
 
         # Evaluate forecasted phases
-        history_metrics_values = df_time_series.head(-forecast_horizon)["y"].tolist()
         forecasted_metric_values = df_forecast["XGBRegressor"].tolist()
         forecasted_metric_phases = time_series_phases(forecasted_metric_values)
         df_forecasted_metric_phases_features = extrapolate_phases_properties(
@@ -527,7 +526,12 @@ if __name__ == "__main__":
         if SHOW_PLOTS:
             log.info(f"Plotting forecasted curve for metric {feature_target}...\n")
             full_months = list(range(len(metrics_time_series[feature_target]["dates"])))
+
+            history_metrics_values = df_time_series.head(-forecast_horizon)[
+                "y"
+            ].tolist()
             full_values = history_metrics_values + forecasted_metric_values
+
             forecast_metric_plot = create_plot(
                 "Forecasted {} {}".format(
                     feature_target, repository_db_record["full_name"]
