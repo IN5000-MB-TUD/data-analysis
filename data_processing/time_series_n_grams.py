@@ -125,6 +125,11 @@ if __name__ == "__main__":
         distinct_tokens, tokens_frequency, bi_grams_frequency
     )
 
+    # Save csv file
+    bi_grams_probability_table.to_csv(
+        "../data/bi_grams_probability_table.csv", index=False
+    )
+
     log.info(f"Probability Table: \n")
     log.info(bi_grams_probability_table)
 
@@ -179,5 +184,10 @@ if __name__ == "__main__":
     sequences_probability = pd.DataFrame(sequences_probability_rows)
     log.info(f"Sequences Probability Table: \n")
     log.info(sequences_probability)
+
+    # Save csv file
+    sequences_probability.to_csv(
+        "../data/time_series_phases_probabilities.csv", index=False
+    )
 
     log.info("Done!")

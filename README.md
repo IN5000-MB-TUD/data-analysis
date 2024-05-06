@@ -68,7 +68,7 @@ cd data_processing
 python time_series_phases.py
 
 # Gather the occurrence probabilities of each phase (stored in the database)
-python time_series_phase_probability.py
+python time_series_n_grams.py
 ```
 
 #### Repositories Clustering
