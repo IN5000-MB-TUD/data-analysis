@@ -13,7 +13,7 @@ from utils.data import (
     get_metrics_information,
     get_metric_time_series,
 )
-from utils.pipeline import forecast_scenario_patterns
+from utils.pipeline import log_forecast_values
 from utils.time_series import group_metric_by_month, group_size_by_month
 
 # Setup logging
@@ -186,37 +186,27 @@ if __name__ == "__main__":
         "SCENARIO 1: New feature implementation over 24 months, how many more contributors are needed?"
     )
 
-    scenario_months = 24
-    scenario_metric_target = "contributors"
-    metrics_pattern_hypothesis = {
-        "stargazers": 1,
-        "releases": 1,
-        "commits": 0,
-        "deployments": 2,
-        "issues": 1,
-        "forks": 1,
-        "pull_requests": 0,
-        "workflows": 2,
-        "size": 0,
-    }
-    forecasting_model = joblib.load(
-        f"{models_path}/mts_forecast_{scenario_metric_target}.pickle"
-    )
-
-    _, forecasted_clustered_phases = forecast_scenario_patterns(
-        scenario_metric_target,
-        scenario_months,
-        REPOSITORY_FULL_NAME,
-        df_multi_time_series,
-        metrics_pattern_hypothesis,
-        phases_statistical_properties,
-        forecasting_model,
-        phases_clustering_model,
-    )
-
-    log.info(
-        f"The forecasted patterns for the metric {scenario_metric_target} in the next {scenario_months} months are: "
-        f"{[PHASES_LABELS[phase_id] for phase_id in forecasted_clustered_phases]}"
+    log_forecast_values(
+        scenario_metric_target="contributors",
+        scenario_months=24,
+        repository_full_name=REPOSITORY_FULL_NAME,
+        metrics_time_series=metrics_time_series,
+        df_multi_time_series=df_multi_time_series,
+        metrics_pattern_hypothesis={
+            "stargazers": 1,
+            "releases": 1,
+            "commits": 0,
+            "deployments": 2,
+            "issues": 1,
+            "forks": 1,
+            "pull_requests": 0,
+            "workflows": 2,
+            "size": 0,
+        },
+        phases_statistical_properties=phases_statistical_properties,
+        models_path=models_path,
+        phases_labels=PHASES_LABELS,
+        phases_clustering_model=phases_clustering_model,
     )
 
     log.info("---------------------------------------------------\n")
@@ -226,37 +216,27 @@ if __name__ == "__main__":
         "SCENARIO 2: Major refactoring over 6 months, how many releases should be planned?"
     )
 
-    scenario_months = 6
-    scenario_metric_target = "releases"
-    metrics_pattern_hypothesis = {
-        "stargazers": 2,
-        "contributors": 2,
-        "commits": 0,
-        "deployments": 2,
-        "issues": 0,
-        "forks": 0,
-        "pull_requests": 0,
-        "workflows": 2,
-        "size": 0,
-    }
-    forecasting_model = joblib.load(
-        f"{models_path}/mts_forecast_{scenario_metric_target}.pickle"
-    )
-
-    _, forecasted_clustered_phases = forecast_scenario_patterns(
-        scenario_metric_target,
-        scenario_months,
-        REPOSITORY_FULL_NAME,
-        df_multi_time_series,
-        metrics_pattern_hypothesis,
-        phases_statistical_properties,
-        forecasting_model,
-        phases_clustering_model,
-    )
-
-    log.info(
-        f"The forecasted patterns for the metric {scenario_metric_target} in the next {scenario_months} months are: "
-        f"{[PHASES_LABELS[phase_id] for phase_id in forecasted_clustered_phases]}"
+    log_forecast_values(
+        scenario_metric_target="releases",
+        scenario_months=6,
+        repository_full_name=REPOSITORY_FULL_NAME,
+        metrics_time_series=metrics_time_series,
+        df_multi_time_series=df_multi_time_series,
+        metrics_pattern_hypothesis={
+            "stargazers": 2,
+            "contributors": 2,
+            "commits": 0,
+            "deployments": 2,
+            "issues": 0,
+            "forks": 0,
+            "pull_requests": 0,
+            "workflows": 2,
+            "size": 0,
+        },
+        phases_statistical_properties=phases_statistical_properties,
+        models_path=models_path,
+        phases_labels=PHASES_LABELS,
+        phases_clustering_model=phases_clustering_model,
     )
 
     log.info("---------------------------------------------------\n")
@@ -266,37 +246,27 @@ if __name__ == "__main__":
         "SCENARIO 3: Major bug fixing over 12 months after users reporting them, how many code changes are expected?"
     )
 
-    scenario_months = 12
-    scenario_metric_target = "size"
-    metrics_pattern_hypothesis = {
-        "stargazers": 2,
-        "contributors": 2,
-        "commits": 0,
-        "deployments": 2,
-        "issues": 0,
-        "forks": 0,
-        "pull_requests": 0,
-        "workflows": 2,
-        "releases": 1,
-    }
-    forecasting_model = joblib.load(
-        f"{models_path}/mts_forecast_{scenario_metric_target}.pickle"
-    )
-
-    _, forecasted_clustered_phases = forecast_scenario_patterns(
-        scenario_metric_target,
-        scenario_months,
-        REPOSITORY_FULL_NAME,
-        df_multi_time_series,
-        metrics_pattern_hypothesis,
-        phases_statistical_properties,
-        forecasting_model,
-        phases_clustering_model,
-    )
-
-    log.info(
-        f"The forecasted patterns for the metric {scenario_metric_target} in the next {scenario_months} months are: "
-        f"{[PHASES_LABELS[phase_id] for phase_id in forecasted_clustered_phases]}"
+    log_forecast_values(
+        scenario_metric_target="size",
+        scenario_months=12,
+        repository_full_name=REPOSITORY_FULL_NAME,
+        metrics_time_series=metrics_time_series,
+        df_multi_time_series=df_multi_time_series,
+        metrics_pattern_hypothesis={
+            "stargazers": 2,
+            "contributors": 2,
+            "commits": 0,
+            "deployments": 2,
+            "issues": 0,
+            "forks": 0,
+            "pull_requests": 0,
+            "workflows": 2,
+            "releases": 1,
+        },
+        phases_statistical_properties=phases_statistical_properties,
+        models_path=models_path,
+        phases_labels=PHASES_LABELS,
+        phases_clustering_model=phases_clustering_model,
     )
 
     log.info("---------------------------------------------------\n")
@@ -306,37 +276,27 @@ if __name__ == "__main__":
         "SCENARIO 4: Major architectural change in the codebase planned in the next 36 months, how many new issues is this expected to trigger?"
     )
 
-    scenario_months = 36
-    scenario_metric_target = "issues"
-    metrics_pattern_hypothesis = {
-        "stargazers": 1,
-        "contributors": 1,
-        "commits": 0,
-        "deployments": 2,
-        "size": 0,
-        "forks": 0,
-        "pull_requests": 0,
-        "workflows": 2,
-        "releases": 0,
-    }
-    forecasting_model = joblib.load(
-        f"{models_path}/mts_forecast_{scenario_metric_target}.pickle"
-    )
-
-    _, forecasted_clustered_phases = forecast_scenario_patterns(
-        scenario_metric_target,
-        scenario_months,
-        REPOSITORY_FULL_NAME,
-        df_multi_time_series,
-        metrics_pattern_hypothesis,
-        phases_statistical_properties,
-        forecasting_model,
-        phases_clustering_model,
-    )
-
-    log.info(
-        f"The forecasted patterns for the metric {scenario_metric_target} in the next {scenario_months} months are: "
-        f"{[PHASES_LABELS[phase_id] for phase_id in forecasted_clustered_phases]}"
+    log_forecast_values(
+        scenario_metric_target="issues",
+        scenario_months=36,
+        repository_full_name=REPOSITORY_FULL_NAME,
+        metrics_time_series=metrics_time_series,
+        df_multi_time_series=df_multi_time_series,
+        metrics_pattern_hypothesis={
+            "stargazers": 1,
+            "contributors": 1,
+            "commits": 0,
+            "deployments": 2,
+            "size": 0,
+            "forks": 0,
+            "pull_requests": 0,
+            "workflows": 2,
+            "releases": 0,
+        },
+        phases_statistical_properties=phases_statistical_properties,
+        models_path=models_path,
+        phases_labels=PHASES_LABELS,
+        phases_clustering_model=phases_clustering_model,
     )
 
     log.info("---------------------------------------------------\n")
@@ -346,37 +306,27 @@ if __name__ == "__main__":
         "SCENARIO 5: As the community of contributors is growing and the project is being forked more, how many pull requests are expected to be opened in the next 12 months?"
     )
 
-    scenario_months = 12
-    scenario_metric_target = "pull_requests"
-    metrics_pattern_hypothesis = {
-        "stargazers": 0,
-        "contributors": 0,
-        "commits": 1,
-        "deployments": 2,
-        "size": 1,
-        "forks": 0,
-        "issues": 1,
-        "workflows": 2,
-        "releases": 2,
-    }
-    forecasting_model = joblib.load(
-        f"{models_path}/mts_forecast_{scenario_metric_target}.pickle"
-    )
-
-    _, forecasted_clustered_phases = forecast_scenario_patterns(
-        scenario_metric_target,
-        scenario_months,
-        REPOSITORY_FULL_NAME,
-        df_multi_time_series,
-        metrics_pattern_hypothesis,
-        phases_statistical_properties,
-        forecasting_model,
-        phases_clustering_model,
-    )
-
-    log.info(
-        f"The forecasted patterns for the metric {scenario_metric_target} in the next {scenario_months} months are: "
-        f"{[PHASES_LABELS[phase_id] for phase_id in forecasted_clustered_phases]}"
+    log_forecast_values(
+        scenario_metric_target="pull_requests",
+        scenario_months=12,
+        repository_full_name=REPOSITORY_FULL_NAME,
+        metrics_time_series=metrics_time_series,
+        df_multi_time_series=df_multi_time_series,
+        metrics_pattern_hypothesis={
+            "stargazers": 0,
+            "contributors": 0,
+            "commits": 1,
+            "deployments": 2,
+            "size": 1,
+            "forks": 0,
+            "issues": 1,
+            "workflows": 2,
+            "releases": 2,
+        },
+        phases_statistical_properties=phases_statistical_properties,
+        models_path=models_path,
+        phases_labels=PHASES_LABELS,
+        phases_clustering_model=phases_clustering_model,
     )
 
     log.info("---------------------------------------------------\n")
