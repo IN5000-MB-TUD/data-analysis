@@ -95,6 +95,7 @@ def forecast_scenario_values(
 ):
     """Compute the forecast scenario values"""
     forecast_values = []
+    latest_break_point = 0
     for i, metric_phase_idx in enumerate(forecasted_metric_phases):
         metric_pattern = forecasted_clustered_phases[i]
         poly_coefficients = [
@@ -103,10 +104,13 @@ def forecast_scenario_values(
             phases_statistical_properties[f"phase_{metric_pattern}"]["coeff_1"],
             phases_statistical_properties[f"phase_{metric_pattern}"]["coeff_0"],
         ]
-        y = np.polyval(poly_coefficients, list(range(0, metric_phase_idx))).tolist()
+        y = np.polyval(
+            poly_coefficients, list(range(latest_break_point, metric_phase_idx))
+        ).tolist()
 
         forecast_values.extend([int(y_val + latest_metric_value) for y_val in y])
         latest_metric_value = forecast_values[-1]
+        latest_break_point = metric_phase_idx
 
     return forecast_values
 
