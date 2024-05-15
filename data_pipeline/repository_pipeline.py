@@ -305,7 +305,7 @@ if __name__ == "__main__":
     if SHOW_PLOTS:
         log.info(f"Plotting metric merged curve")
         metric_plot = create_plot(
-            "Merged Time Series",
+            f"Merged Time Series - {REPOSITORY_FULL_NAME}",
             "",
             "Month",
             "Trend",
