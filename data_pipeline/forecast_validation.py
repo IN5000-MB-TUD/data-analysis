@@ -4,6 +4,7 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
+from sklearn.metrics import r2_score
 
 from connection import mo
 from data_processing.time_series_forecasting import TRAINING_SETTINGS
@@ -16,7 +17,6 @@ from utils.data import (
     get_metrics_information,
     get_metric_time_series,
 )
-from utils.pipeline import rmse
 from utils.time_series import (
     group_metric_by_month,
     group_size_by_month,
@@ -246,11 +246,11 @@ if __name__ == "__main__":
             f"The forecasted phases for the metric {feature_target} in the next {forecast_horizon} months are: {[PHASES_LABELS[phase_id] for phase_id in forecasted_clustered_phases]}"
         )
 
-        # Compute MSE
-        mean_square_error = rmse(
+        # Compute R2
+        r2_value = r2_score(
             metrics_time_series[feature_target]["values"], full_values
         )
-        log.info(f"RMSE: {mean_square_error}")
+        log.info(f"R2: {r2_value}")
 
         if SHOW_PLOTS:
             log.info(f"Plotting forecasted curve for metric {feature_target}...\n")
@@ -260,7 +260,7 @@ if __name__ == "__main__":
                 "Forecasted {} {}".format(
                     feature_target, repository_db_record["full_name"]
                 ),
-                "RMSE: {}".format(round(mean_square_error, 3)),
+                "R2 Score: {}".format(round(r2_value, 3)),
                 "Date",
                 "Count",
                 full_months,
