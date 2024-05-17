@@ -171,3 +171,9 @@ def log_forecast_values(
     log.info(
         f"The {scenario_metric_target} value is predicted to go from {forecast_values[0]} to {forecast_values[-1]}, with an overall growth of {forecast_values[-1] - forecast_values[0]}"
     )
+
+
+def rmse(actual, pred):
+    """Compute Root MSE"""
+    actual, pred = np.array(actual), np.array(pred)
+    return np.sqrt(np.square(np.subtract(actual, pred)).mean())

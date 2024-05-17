@@ -4,7 +4,6 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-from utilsforecast.losses import mse
 
 from connection import mo
 from data_processing.time_series_forecasting import TRAINING_SETTINGS
@@ -17,6 +16,7 @@ from utils.data import (
     get_metrics_information,
     get_metric_time_series,
 )
+from utils.pipeline import rmse
 from utils.time_series import (
     group_metric_by_month,
     group_size_by_month,
@@ -211,17 +211,30 @@ if __name__ == "__main__":
             dropna=False,
         )
 
-        model_mse_df = mse(
-            df_forecast, models=["XGBRegressor"], id_col="unique_id", target_col="y"
-        )
-
         # Evaluate forecasted phases
         forecasted_metric_values = df_forecast["XGBRegressor"].tolist()
         history_metrics_values = df_time_series.head(-forecast_horizon)["y"].tolist()
 
         full_values = history_metrics_values + forecasted_metric_values
+        full_values = [
+            int(
+                round(
+                    x
+                    * (
+                        metrics_time_series[feature_target]["values"][-1]
+                        - metrics_time_series[feature_target]["values"][0]
+                    )
+                    + metrics_time_series[feature_target]["values"][0]
+                )
+            )
+            for x in full_values
+        ]
 
         forecasted_metric_phases = time_series_phases(full_values)
+        log.info(
+            f"The forecasted phases breakpoints for the metric {feature_target} in the next {forecast_horizon} months are: {[metrics_time_series[feature_target]['dates'][i - 1] for i in forecasted_metric_phases]}"
+        )
+
         df_forecasted_metric_phases_features = extrapolate_phases_properties(
             forecasted_metric_phases, full_values
         )
@@ -233,6 +246,12 @@ if __name__ == "__main__":
             f"The forecasted phases for the metric {feature_target} in the next {forecast_horizon} months are: {[PHASES_LABELS[phase_id] for phase_id in forecasted_clustered_phases]}"
         )
 
+        # Compute MSE
+        mean_square_error = rmse(
+            metrics_time_series[feature_target]["values"], full_values
+        )
+        log.info(f"RMSE: {mean_square_error}")
+
         if SHOW_PLOTS:
             log.info(f"Plotting forecasted curve for metric {feature_target}...\n")
             full_months = list(range(len(metrics_time_series[feature_target]["dates"])))
@@ -241,11 +260,11 @@ if __name__ == "__main__":
                 "Forecasted {} {}".format(
                     feature_target, repository_db_record["full_name"]
                 ),
-                "MSE: {}".format(model_mse_df["XGBRegressor"].loc[0]),
+                "RMSE: {}".format(round(mean_square_error, 3)),
                 "Date",
                 "Count",
                 full_months,
-                [full_values, df_time_series["y"].tolist()],
+                [full_values, metrics_time_series[feature_target]["values"]],
             )
             forecast_metric_plot.axvline(
                 x=len(history_metrics_values),
@@ -253,3 +272,5 @@ if __name__ == "__main__":
                 label="axvline - full height",
             )
             forecast_metric_plot.show()
+
+        log.info("--------------------------------------------------------------\n")
