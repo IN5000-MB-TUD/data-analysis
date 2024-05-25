@@ -166,7 +166,6 @@ if __name__ == "__main__":
     df_multi_time_series = df_multi_time_series.fillna(0)
 
     models_path = f"../models/forecasting/cluster_{REPOSITORY_CLUSTER}"
-    # forecast_horizon = 12 * int((repository_age_months - 12) / 12)
     forecast_horizon = repository_age_months - 12
 
     if not Path("../models/phases/mts_phases_classifier.pickle").exists():
@@ -247,9 +246,7 @@ if __name__ == "__main__":
         )
 
         # Compute R2
-        r2_value = r2_score(
-            metrics_time_series[feature_target]["values"], full_values
-        )
+        r2_value = r2_score(metrics_time_series[feature_target]["values"], full_values)
         log.info(f"R2: {r2_value}")
 
         if SHOW_PLOTS:
