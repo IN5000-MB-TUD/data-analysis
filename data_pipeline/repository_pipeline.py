@@ -206,15 +206,22 @@ if __name__ == "__main__":
             show_plot=SHOW_PLOTS,
             plot_title=f"{REPOSITORY_FULL_NAME} {metric}",
         )
+
+        normalized_values = normalize(metric_data["values"], 0, 1) + [1]
+
         metrics_phases[metric] = {
             "phases": metric_phases_idxs,
             "phases_count": len(metric_phases_idxs),
             "phases_dates": [metric_data["dates"][i - 1] for i in metric_phases_idxs],
+            "phases_normalized_value": [
+                round(normalized_values[i], 2) for i in metric_phases_idxs
+            ],
         }
 
         log.info(
             f"{metric} {metrics_phases[metric]['phases_count']} phases breakpoints: {metrics_phases[metric]['phases']}, {metrics_phases[metric]['phases_dates']}"
         )
+        log.info(metrics_phases[metric]["phases_normalized_value"])
 
     log.info("Extrapolating metrics time series phases statistical properties...")
     phases_features = pd.DataFrame()

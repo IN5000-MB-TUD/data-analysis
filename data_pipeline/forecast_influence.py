@@ -3,7 +3,10 @@ from math import ceil
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
+from mlforecast import MLForecast
+from sklearn.linear_model import LinearRegression
 
 from connection import mo
 from data_processing.time_series_phases import extrapolate_phases_properties
@@ -16,7 +19,6 @@ from utils.data import (
     get_stargazers_time_series,
 )
 from utils.main import normalize
-from utils.pipeline import forecast_scenario_values
 from utils.time_series import (
     group_metric_by_month,
     group_size_by_month,
@@ -26,40 +28,17 @@ from utils.time_series import (
 # Setup logging
 log = logging.getLogger(__name__)
 
-REPOSITORY_FULL_NAME = "saltstack/salt"
-REPOSITORY_CLUSTER = 0
-FORECAST_HORIZON = 24
+REPOSITORY_FULL_NAME = "SuperEvilMegacorp/vainglory-assets"
+CUT_MONTH = 20
 SHOW_PLOTS = True
 METRICS_INFLUENCE = {
-    "stargazers": {
-        "releases": 0,
-        "commits": 0,
-        "contributors": 1,
-        "deployments": 1,
-        "issues": 1,
-        "forks": 2,
-        "pull_requests": 2,
-        "workflows": 1,
-        "size": 1,
-    },
-    "issues": {
-        "stargazers": 1,
-        "releases": 1,
-        "commits": 0,
-        "contributors": 1,
-        "deployments": 1,
-        "forks": 1,
-        "pull_requests": 0,
-        "workflows": 1,
-        "size": 0,
-    },
     "commits": {
-        "stargazers": 2,
+        "stargazers": 1,
         "releases": 0,
         "issues": 0,
         "contributors": 0,
         "deployments": 2,
-        "forks": 2,
+        "forks": 1,
         "pull_requests": 0,
         "workflows": 2,
         "size": 0,
@@ -169,8 +148,6 @@ if __name__ == "__main__":
             "coeff_3": phase["value__friedrich_coefficients__coeff_3__m_3__r_30"],
         }
 
-    models_path = f"../models/forecasting/cluster_{REPOSITORY_CLUSTER}"
-
     if not Path("../models/phases/mts_phases_classifier.pickle").exists():
         log.warning(
             "The phases clustering classifier model does not exists in the /models/phases folder. "
@@ -181,28 +158,49 @@ if __name__ == "__main__":
         "../models/phases/mts_phases_classifier.pickle"
     )
 
+    forecast_horizon = repository_age_months - CUT_MONTH
+
     for metric, metrics_patterns in METRICS_INFLUENCE.items():
         log.info(f"Validate influence on {metric}")
 
         # Estimate further growth for the other metrics
         influence_metrics_values = {}
         for influence_metric, influence_phase in metrics_patterns.items():
-            metric_forecast_values = forecast_scenario_values(
-                metrics_time_series[influence_metric]["values"][-1],
-                [FORECAST_HORIZON],
-                [influence_phase],
-                phases_statistical_properties,
+            if influence_phase != 2:
+                poly_coefficients = [
+                    phases_statistical_properties[f"phase_{influence_phase}"][
+                        "coeff_3"
+                    ],
+                    phases_statistical_properties[f"phase_{influence_phase}"][
+                        "coeff_2"
+                    ],
+                    phases_statistical_properties[f"phase_{influence_phase}"][
+                        "coeff_1"
+                    ],
+                    phases_statistical_properties[f"phase_{influence_phase}"][
+                        "coeff_0"
+                    ],
+                ]
+            else:
+                poly_coefficients = [0, 0, 0, 0]
+            y = np.polyval(poly_coefficients, list(range(0, forecast_horizon))).tolist()
+            y_normalized = normalize(y, 0, 1)
+
+            normalized_metric_values = normalize(
+                metrics_time_series[influence_metric]["values"][:CUT_MONTH], 0, 1
             )
+            y_adjusted = [
+                y_value + normalized_metric_values[-1] for y_value in y_normalized
+            ]
+
             influence_metrics_values[influence_metric] = (
-                metrics_time_series[influence_metric]["values"] + metric_forecast_values
+                normalized_metric_values[:CUT_MONTH] + y_adjusted
             )
             influence_metrics_values[influence_metric] = normalize(
                 influence_metrics_values[influence_metric], 0, 1
             )
 
         # Balance the normalization of the target metric
-        scenario_ds = [repository_age_months + x for x in range(0, FORECAST_HORIZON)]
-        normalization_ratio = repository_age_months / scenario_ds[-1]
         influence_metrics_values[metric] = normalize(
             metrics_time_series[metric]["values"], 0, 1
         )
@@ -230,59 +228,60 @@ if __name__ == "__main__":
             REPOSITORY_FULL_NAME
         ] * repository_age_months
         for influence_metric, metric_data in influence_metrics_values.items():
-            df_multi_time_series[influence_metric] = metric_data[:repository_age_months]
+            df_multi_time_series[influence_metric] = metric_data
+
         df_time_series = df_multi_time_series.rename(columns={metric: "y"}).reset_index(
             drop=True
         )
 
-        df_hypothesis = {
-            "ds": scenario_ds,
-            "unique_id": [REPOSITORY_FULL_NAME] * FORECAST_HORIZON,
-        }
-        for influence_metric, metric_data in influence_metrics_values.items():
-            if influence_metric != metric:
-                df_hypothesis[influence_metric] = metric_data[repository_age_months:]
-        df_hypothesis = pd.DataFrame(df_hypothesis)
-
-        # Forecast target metric
-        df_forecast_input = df_time_series._append(
-            df_hypothesis, ignore_index=True
-        ).drop(columns=["y"])
-
-        forecasting_model = joblib.load(f"{models_path}/mts_forecast_{metric}.pickle")
-        df_forecast = (
-            forecasting_model.predict(
-                FORECAST_HORIZON + 12,
-                ids=[REPOSITORY_FULL_NAME],
-                X_df=df_forecast_input,
-            )
-            .tail(FORECAST_HORIZON)
+        # Split dataset
+        df_training = df_time_series.head(CUT_MONTH).reset_index(drop=True)
+        df_validation = (
+            df_time_series.tail(forecast_horizon)
+            .drop(columns=["y"])
             .reset_index(drop=True)
         )
 
+        model = MLForecast(
+            models=LinearRegression(),
+            freq=1,
+        )
+
+        # Fit training data to the model
+        model.fit(
+            df_training,
+            id_col="unique_id",
+            time_col="ds",
+            target_col="y",
+            static_features=[],
+        )
+        df_forecast = model.predict(
+            h=forecast_horizon,
+            X_df=df_validation,
+            ids=[REPOSITORY_FULL_NAME],
+        )
+
         # Evaluate forecasted patterns
-        forecasted_metric_values = df_forecast["XGBRegressor"].tolist()
-        forecasted_metric_phases = time_series_phases(forecasted_metric_values)
-        df_forecasted_metric_phases_features = extrapolate_phases_properties(
-            forecasted_metric_phases, forecasted_metric_values
+        forecasted_metric_values = df_forecast["LinearRegression"].tolist()
+        full_values = (
+            influence_metrics_values[metric][:CUT_MONTH] + forecasted_metric_values
         )
+        full_values = normalize(full_values, 0, 1)
 
+        metric_phases = time_series_phases(forecasted_metric_values)
+        df_metric_phases_features = extrapolate_phases_properties(
+            metric_phases, forecasted_metric_values
+        )
         forecasted_clustered_phases = phases_clustering_model.predict(
-            df_forecasted_metric_phases_features.drop(columns=["phase_order"])
+            df_metric_phases_features.drop(columns=["phase_order"])
         )
-
         log.info(
             f"Forecasted pattern for metric {metric}: {[PHASES_LABELS[i] for i in forecasted_clustered_phases]}"
         )
 
         if SHOW_PLOTS:
             log.info(f"Plotting forecasted curve for metric {metric}...\n")
-            full_months = list(range(repository_age_months)) + [
-                repository_age_months + x for x in range(1, FORECAST_HORIZON + 1)
-            ]
-
-            history_metrics_values = df_time_series["y"].tolist()
-            full_values = history_metrics_values + forecasted_metric_values
+            full_months = list(range(repository_age_months))
 
             forecast_metric_plot = create_plot(
                 "Forecasted {} {}".format(metric, REPOSITORY_FULL_NAME),
@@ -290,10 +289,10 @@ if __name__ == "__main__":
                 "Date",
                 "Trend",
                 full_months,
-                [full_values],
+                [full_values, influence_metrics_values[metric]],
             )
             forecast_metric_plot.axvline(
-                x=repository_age_months - 1,
+                x=CUT_MONTH,
                 color="g",
                 label="axvline - full height",
             )
