@@ -1,5 +1,6 @@
 import json
 import logging
+from itertools import product
 from pathlib import Path
 
 import pandas as pd
@@ -64,17 +65,6 @@ def generate_probability_table(
 if __name__ == "__main__":
     log.info("Start computing phases probabilities")
 
-    # Retrieve phases from database
-    evolution_phases = mo.db["evolution_phases"].find()
-    phases_names = {}
-    for phase in evolution_phases:
-        phases_names[f"phase_{phase['phase_id']}"] = {
-            "phase_id": phase["phase_id"],
-            "phase_name": phase["phase_name"],
-        }
-
-    PHASES = len(phases_names)
-
     if not Path("../data/repository_metrics_phases.json").exists():
         log.warning(
             "The repository_metrics_phases.json file is not present in the data folder. Please run the time_series_phases.py script first!"
@@ -133,42 +123,15 @@ if __name__ == "__main__":
     log.info(f"Probability Table: \n")
     log.info(bi_grams_probability_table)
 
-    sequences = [
-        # Steep first
-        [0, 0, 0],
-        [0, 1, 0],
-        [0, 2, 0],
-        [0, 0, 1],
-        [0, 1, 1],
-        [0, 2, 1],
-        [0, 0, 2],
-        [0, 1, 2],
-        [0, 2, 2],
-        # Shallow first
-        [1, 0, 0],
-        [1, 1, 0],
-        [1, 2, 0],
-        [1, 0, 1],
-        [1, 1, 1],
-        [1, 2, 1],
-        [1, 0, 2],
-        [1, 1, 2],
-        [1, 2, 2],
-        # Plateau first
-        [2, 0, 0],
-        [2, 1, 0],
-        [2, 2, 0],
-        [2, 0, 1],
-        [2, 1, 1],
-        [2, 2, 1],
-        [2, 0, 2],
-        [2, 1, 2],
-        [2, 2, 2],
-    ]
+    # Tri-grams
+    sequences = []
+    for i in product([0, 1, 2], repeat=3):
+        sequences.append(list(i))
+
     sequences_probability_rows = []
     for sequence in sequences:
         sequence_tokens = [PATTERNS_LABELS[i].lower() for i in sequence]
-        sequence_bi_grams = generate_ngrams(["eos"] + sequence_tokens, 2)
+        sequence_bi_grams = generate_ngrams(["eos"] + sequence_tokens + ["eos"], 2)
         probability = 1
         for bi_gram in sequence_bi_grams:
             probability *= bi_grams_probability_table.loc[
