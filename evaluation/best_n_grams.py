@@ -14,6 +14,11 @@ log = logging.getLogger(__name__)
 
 # Declare constants
 PATTERNS_LABELS = ["Steep", "Shallow", "Plateau"]
+PATTERNS_MAP = {
+    "steep": 0,
+    "shallow": 1,
+    "plateau": 2,
+}
 N_TESTS = [2, 3, 4, 5, 6]
 
 if __name__ == "__main__":
@@ -53,5 +58,65 @@ if __name__ == "__main__":
             n_grams_probability[f"{n}_grams"][
                 " - ".join([PATTERNS_LABELS[i] for i in sequence])
             ] = round(probability, 4)
+
+    # Evaluate the best N performance
+    n_grams_accuracy = {}
+    for n in N_TESTS:
+        total_predictions = 0
+        correct_predictions = 0
+
+        for repository_name, repository_metrics in repository_metrics_phases.items():
+            for metric, metric_patterns in repository_metrics.items():
+                if repository_metrics_phases_count[repository_name][metric] >= n:
+                    # Predict next patterns based on probabilities
+                    backwards_n = n - 1
+                    predicted = [i for i in metric_patterns[:backwards_n]]
+                    moving_idx = backwards_n
+                    for i in metric_patterns[backwards_n:]:
+                        base_patterns = [
+                            PATTERNS_LABELS[i].lower()
+                            for i in predicted[moving_idx - backwards_n : moving_idx]
+                        ]
+                        base_patterns = " - ".join(base_patterns)
+
+                        # Look for highest probability
+                        highest_probability = -1
+                        best_next_pattern = ""
+                        for sequence, probability in n_grams_probability[
+                            f"{n}_grams"
+                        ].items():
+                            lower_sequence = sequence.lower()
+                            if (
+                                lower_sequence.startswith(base_patterns)
+                                and probability > highest_probability
+                            ):
+                                highest_probability = probability
+                                best_next_pattern = lower_sequence.split(" - ")[-1]
+
+                        predicted.append(PATTERNS_MAP[best_next_pattern])
+                        moving_idx += 1
+
+                    # Count correct predictions
+                    for idx, pred_values in enumerate(predicted[backwards_n:]):
+                        total_predictions += 1
+                        if pred_values == metric_patterns[idx]:
+                            correct_predictions += 1
+
+        if total_predictions > 0:
+            n_grams_accuracy[f"{n}_grams"] = {
+                "correct_predictions": correct_predictions,
+                "total_predictions": total_predictions,
+                "performance": correct_predictions / total_predictions,
+            }
+
+    log.info(n_grams_accuracy)
+
+    best_accuracy = -1
+    best_n = ""
+    for n_key, n_items in n_grams_accuracy.items():
+        if n_items["performance"] > best_accuracy:
+            best_accuracy = n_items["performance"]
+            best_n = n_key
+    log.info(f"Best N is {best_n} with accuracy {round(best_accuracy, 3)}")
 
     log.info("Done!")

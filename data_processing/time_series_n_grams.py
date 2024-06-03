@@ -80,11 +80,13 @@ if __name__ == "__main__":
     max_segments = -1
     for repository_name, metrics_phases in repository_metrics_phases.items():
         for metric, phases in metrics_phases.items():
-            max_segments = max(
-                max_segments, repository_metrics_phases_count[repository_name][metric]
-            )
-            patterns_sequence = [PATTERNS_LABELS[x] for x in phases]
-            corpus += " ".join(patterns_sequence) + ". "
+            if repository_metrics_phases_count[repository_name][metric] > 1:
+                max_segments = max(
+                    max_segments,
+                    repository_metrics_phases_count[repository_name][metric],
+                )
+                patterns_sequence = [PATTERNS_LABELS[x] for x in phases]
+                corpus += " ".join(patterns_sequence) + ". "
 
     log.info(f"Max segments: {max_segments}")
 
