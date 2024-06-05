@@ -128,6 +128,7 @@ if __name__ == "__main__":
     # Get the repositories in the database
     repositories = mo.db["repositories_data"].find({"statistics": {"$exists": True}})
     repository_metrics_phases_count = {}
+    repository_metrics_phases_idxs = {}
 
     if not Path("../data/time_series_phases.csv").exists():
         phases_features = pd.DataFrame()
@@ -136,6 +137,7 @@ if __name__ == "__main__":
             log.info("Analyzing repository {}".format(repository["full_name"]))
 
             repository_metrics_phases_count[repository["full_name"]] = {}
+            repository_metrics_phases_idxs[repository["full_name"]] = {}
 
             repository_age_months = ceil(repository["age"] / 2629746)
             repository_age_start = repository["created_at"].replace(
@@ -177,6 +179,9 @@ if __name__ == "__main__":
                 repository_metrics_phases_count[repository["full_name"]][metric] = len(
                     metric_phases_idxs
                 )
+                repository_metrics_phases_idxs[repository["full_name"]][metric] = [
+                    int(i) for i in metric_phases_idxs
+                ]
                 log.info(f"{metric} phases: {metric_phases_idxs}")
 
             # Handle repository size time series data
@@ -199,6 +204,9 @@ if __name__ == "__main__":
             repository_metrics_phases_count[repository["full_name"]]["size"] = len(
                 size_phases_idxs
             )
+            repository_metrics_phases_idxs[repository["full_name"]]["size"] = [
+                int(i) for i in size_phases_idxs
+            ]
             log.info(f"size phases: {size_phases_idxs}")
 
             # Extrapolate metrics time series phases statistical properties
@@ -220,6 +228,8 @@ if __name__ == "__main__":
         phases_features.to_csv("../data/time_series_phases.csv", index=False)
         with open("../data/repository_metrics_phases_count.json", "w") as outfile:
             json.dump(repository_metrics_phases_count, outfile, indent=4)
+        with open("../data/repository_metrics_phases_idxs.json", "w") as outfile:
+            json.dump(repository_metrics_phases_idxs, outfile, indent=4)
     else:
         # Load data
         phases_features = pd.read_csv("../data/time_series_phases.csv")
