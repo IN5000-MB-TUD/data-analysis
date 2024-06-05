@@ -38,7 +38,7 @@ def generate_ngram_freq(n_gram):
 
 
 def generate_probability_table(
-    distinct_tokens_list, distinct_tokens_frequency, ngram_freq
+    distinct_tokens_list, distinct_tokens_frequency, ngram_freq, precision=3
 ):
     """Generate n-grams probability table"""
     n_tokens = len(distinct_tokens_list)
@@ -53,7 +53,9 @@ def generate_probability_table(
             sequence = distinct_tokens_list[i] + " " + distinct_tokens_list[j]
             numerator = ngram_freq[sequence] if sequence in ngram_freq else 0
 
-            row_dict[distinct_tokens_list[j]] = round(numerator / denominator, 3)
+            row_dict[distinct_tokens_list[j]] = round(
+                numerator / denominator, precision
+            )
 
         probability_table_rows.append(row_dict)
 
