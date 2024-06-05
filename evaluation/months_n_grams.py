@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
                 for i in metric_patterns[backwards_n:]:
                     base_patterns = [
-                        i for i in predicted[moving_idx - backwards_n: moving_idx]
+                        i for i in predicted[moving_idx - backwards_n : moving_idx]
                     ]
                     if len(base_patterns) > 1:
                         # Compute probability of n-gram using chain rule and use it to retrieve the best next pattern
@@ -191,6 +191,8 @@ if __name__ == "__main__":
             }
 
     log.info(n_grams_accuracy)
+    with open("../data/n_grams_accuracy.json", "w") as outfile:
+        json.dump(n_grams_accuracy, outfile, indent=4)
 
     best_accuracy = -1
     best_n = ""
