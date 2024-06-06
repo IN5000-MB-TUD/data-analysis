@@ -183,7 +183,9 @@ if __name__ == "__main__":
                     total_predictions += 1
                     if pred_values == metric_patterns[idx]:
                         correct_predictions += 1
-                    deviation_predictions += abs(pred_values - metric_patterns[idx])
+                    deviation_predictions += abs(
+                        PATTERNS_MAP[pred_values] - PATTERNS_MAP[metric_patterns[idx]]
+                    )
 
         if total_predictions > 0:
             n_grams_accuracy[f"{n}_grams"] = {
