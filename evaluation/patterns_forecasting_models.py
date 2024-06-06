@@ -7,7 +7,8 @@ import joblib
 import pandas as pd
 from mlforecast import MLForecast
 from ruptures.metrics import precision_recall
-from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
+from xgboost import XGBRegressor
 
 from connection import mo
 from data_processing.time_series_phases import extrapolate_phases_properties
@@ -18,6 +19,7 @@ from utils.data import (
     get_releases_time_series,
     get_stargazers_time_series,
 )
+from utils.main import normalize
 from utils.time_series import (
     group_metric_by_month,
     group_size_by_month,
@@ -28,6 +30,7 @@ from utils.time_series import (
 log = logging.getLogger(__name__)
 
 REPOSITORY_FULL_NAME = "saltstack/salt"
+REPOSITORY_CLUSTER = 0
 N_MONTHS = [2, 3, 4, 7, 13, 24]
 PHASES_LABELS = ["Steep", "Shallow", "Plateau"]
 METRICS = [
@@ -57,7 +60,9 @@ def _compute_monthly_patterns(metric_patterns, metric_patterns_idxs):
 
 
 if __name__ == "__main__":
-    log.info(f"Evaluate N-months predictions to find the most suitable N for repository: {REPOSITORY_FULL_NAME}\n")
+    log.info(
+        f"Evaluate N-months predictions to find the most suitable N for repository: {REPOSITORY_FULL_NAME}\n"
+    )
 
     repository_db_record = mo.db["repositories_data"].find_one(
         {"full_name": REPOSITORY_FULL_NAME}
@@ -165,7 +170,31 @@ if __name__ == "__main__":
     df_multi_time_series["ds"] = list(range(repository_age_months))
     df_multi_time_series["unique_id"] = [REPOSITORY_FULL_NAME] * repository_age_months
     for metric, metric_data in metrics_time_series.items():
-        df_multi_time_series[metric] = metric_data["values"]
+        df_multi_time_series[metric] = normalize(metric_data["values"], 0, 1)
+
+    # Open full data and remove data from the analyzed repo
+    df_repos_time_series = pd.read_csv("../data/time_series_data.csv")
+    df_repos_time_series["ds"] = pd.to_numeric(
+        df_repos_time_series["ds"], downcast="integer"
+    )
+    df_repos_time_series = df_repos_time_series.loc[
+        df_repos_time_series["cluster"] == REPOSITORY_CLUSTER
+    ]
+    df_repos_time_series = df_repos_time_series.drop(columns=["cluster"])
+    df_repos_time_series = df_repos_time_series.loc[
+        df_repos_time_series["unique_id"] != REPOSITORY_FULL_NAME
+    ]
+    metrics_columns = df_repos_time_series.columns.difference(["ds", "unique_id"])
+    df_repos_time_series[metrics_columns] = (
+        df_repos_time_series[metrics_columns]
+        .groupby("repository")[metrics_columns]
+        .apply(lambda v: (v - v.min()) / (v.max() - v.min()))
+        .reset_index(level=0, drop=True)
+    )
+    df_repos_time_series = df_repos_time_series.fillna(0)
+    df_repos_time_series = df_repos_time_series.drop(
+        columns=["repository"]
+    ).reset_index(drop=True)
 
     if not Path("../models/phases/mts_phases_classifier.pickle").exists():
         log.warning(
@@ -208,10 +237,17 @@ if __name__ == "__main__":
                 .reset_index(drop=True)
             )
 
+            # Append training df to full data
+            df_repos_time_series_training = df_repos_time_series.rename(
+                columns={target_metric: "y"}
+            ).reset_index(drop=True)
+            df_training = df_repos_time_series_training._append(
+                df_training, ignore_index=True
+            )
+
             model = MLForecast(
-                models=LinearRegression(),
+                models=XGBRegressor(random_state=0, n_estimators=100, device="cuda"),
                 freq=1,
-                # lags=list(range(1, n + 1)),
             )
 
             # Fit training data to the model
@@ -221,6 +257,7 @@ if __name__ == "__main__":
                 time_col="ds",
                 target_col="y",
                 static_features=[],
+                keep_last_n=n,
             )
             df_forecast = model.predict(
                 h=forecast_horizon,
@@ -229,7 +266,15 @@ if __name__ == "__main__":
             )
 
             # Evaluate forecasted patterns
-            forecasted_metric_values = df_forecast["LinearRegression"].tolist()
+            forecasted_metric_values = df_forecast["XGBRegressor"].tolist()
+            forecasted_metric_values = normalize(
+                forecasted_metric_values,
+                metrics_time_series[target_metric]["values"][cut_month:][0],
+                metrics_time_series[target_metric]["values"][cut_month:][-1],
+            )
+            forecasted_metric_values = [
+                int(round(x, 0)) for x in forecasted_metric_values
+            ]
             full_values = (
                 metrics_time_series[target_metric]["values"][:cut_month]
                 + forecasted_metric_values
@@ -261,6 +306,15 @@ if __name__ == "__main__":
             precision, recall = precision_recall(
                 repository_patterns_idxs[target_metric], metric_phases
             )
+            r2_value = r2_score(
+                metrics_time_series[target_metric]["values"], full_values
+            )
+
+            log.info(target_metric)
+            log.info(f"R2: {r2_value}")
+            log.info(f"Precision: {precision}")
+            log.info(f"Recall: {recall}")
+            log.info("-----------------")
 
         if total_predictions > 0:
             n_months_accuracy[f"{n}_months"] = {
@@ -269,7 +323,7 @@ if __name__ == "__main__":
                 "performance": correct_predictions / total_predictions,
             }
 
-        log.info("------------------------------------\n")
+        log.info("----------------------------------------------\n")
 
     log.info(n_months_accuracy)
 
