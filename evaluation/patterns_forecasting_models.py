@@ -214,7 +214,11 @@ if __name__ == "__main__":
     repository_patterns = repository_metrics_phases[REPOSITORY_FULL_NAME]
     repository_patterns_idxs = repository_metrics_phases_idxs[REPOSITORY_FULL_NAME]
 
-    n_months_accuracy = {}
+    if not Path("../data/n_patterns_forecast_accuracy.json").exists():
+        n_months_accuracy = {}
+    else:
+        with open("../data/n_patterns_forecast_accuracy.json") as json_file:
+            n_months_accuracy = json.load(json_file)
 
     for n in N_MONTHS:
         log.info(f"Evaluating {n} months training")
@@ -338,6 +342,8 @@ if __name__ == "__main__":
         log.info("----------------------------------------------\n")
 
     log.info(n_months_accuracy)
+    with open("../data/n_patterns_forecast_accuracy.json", "w") as outfile:
+        json.dump(n_months_accuracy, outfile, indent=4)
 
     best_accuracy = -1
     best_n = ""
