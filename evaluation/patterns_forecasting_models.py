@@ -220,6 +220,8 @@ if __name__ == "__main__":
         log.info(f"Evaluating {n} months training")
         total_predictions = 0
         correct_predictions = 0
+        deviation_predictions = 0
+        r2_average = 0
 
         cut_month = n
         forecast_horizon = repository_age_months - cut_month
@@ -298,9 +300,15 @@ if __name__ == "__main__":
             )
 
             for idx, pred_values in enumerate(forecasted_patterns_sequence):
+                # Increase predictions counter
                 total_predictions += 1
+                # Count correct predictions
                 if pred_values == actual_patterns_sequence[idx]:
                     correct_predictions += 1
+                # Compute deviation
+                deviation_predictions += abs(
+                    pred_values - actual_patterns_sequence[idx]
+                )
 
             # Compute scores
             precision, recall = precision_recall(
@@ -309,6 +317,8 @@ if __name__ == "__main__":
             r2_value = r2_score(
                 metrics_time_series[target_metric]["values"], full_values
             )
+
+            r2_average += r2_value
 
             log.info(target_metric)
             log.info(f"R2: {r2_value}")
@@ -321,6 +331,8 @@ if __name__ == "__main__":
                 "correct_predictions": correct_predictions,
                 "total_predictions": total_predictions,
                 "performance": correct_predictions / total_predictions,
+                "deviation": deviation_predictions / total_predictions,
+                "r2": r2_average / len(METRICS),
             }
 
         log.info("----------------------------------------------\n")

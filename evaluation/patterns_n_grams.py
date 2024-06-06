@@ -64,6 +64,7 @@ if __name__ == "__main__":
     for n in N_TESTS:
         total_predictions = 0
         correct_predictions = 0
+        deviation_predictions = 0
 
         for repository_name, repository_metrics in repository_metrics_phases.items():
             for metric, metric_patterns in repository_metrics.items():
@@ -101,12 +102,14 @@ if __name__ == "__main__":
                         total_predictions += 1
                         if pred_values == metric_patterns[idx]:
                             correct_predictions += 1
+                        deviation_predictions += abs(pred_values - metric_patterns[idx])
 
         if total_predictions > 0:
             n_grams_accuracy[f"{n}_grams"] = {
                 "correct_predictions": correct_predictions,
                 "total_predictions": total_predictions,
                 "performance": correct_predictions / total_predictions,
+                "deviation": deviation_predictions / total_predictions,
             }
 
     log.info(n_grams_accuracy)

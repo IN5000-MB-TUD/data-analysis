@@ -111,6 +111,7 @@ if __name__ == "__main__":
         log.info(f"Evaluating {n}-grams...")
         total_predictions = 0
         correct_predictions = 0
+        deviation_predictions = 0
 
         for (
             repository_name,
@@ -182,12 +183,14 @@ if __name__ == "__main__":
                     total_predictions += 1
                     if pred_values == metric_patterns[idx]:
                         correct_predictions += 1
+                    deviation_predictions += abs(pred_values - metric_patterns[idx])
 
         if total_predictions > 0:
             n_grams_accuracy[f"{n}_grams"] = {
                 "correct_predictions": correct_predictions,
                 "total_predictions": total_predictions,
                 "performance": correct_predictions / total_predictions,
+                "deviation": deviation_predictions / total_predictions,
             }
 
     log.info(n_grams_accuracy)
