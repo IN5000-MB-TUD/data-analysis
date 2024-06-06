@@ -57,7 +57,7 @@ def _compute_monthly_patterns(metric_patterns, metric_patterns_idxs):
 
 
 if __name__ == "__main__":
-    log.info(f"Running forecast influence for repository {REPOSITORY_FULL_NAME}\n")
+    log.info(f"Evaluate N-months predictions to find the most suitable N for repository: {REPOSITORY_FULL_NAME}\n")
 
     repository_db_record = mo.db["repositories_data"].find_one(
         {"full_name": REPOSITORY_FULL_NAME}
