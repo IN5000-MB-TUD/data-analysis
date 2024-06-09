@@ -364,6 +364,28 @@ if __name__ == "__main__":
                 best_n = n_key
         log.info(f"Best N is {best_n} with accuracy {round(best_accuracy, 3)}")
 
+    # Compute average scores
+    average_scores = {}
+    for repository, months_values in n_months_accuracy.items():
+        for month_key, month_val in months_values.items():
+            if month_key not in average_scores:
+                average_scores[month_key] = {
+                    "performance": 0,
+                    "deviation": 0,
+                    "r2": 0,
+                }
+            average_scores[month_key]["performance"] += month_val["performance"]
+            average_scores[month_key]["deviation"] += month_val["deviation"]
+            average_scores[month_key]["r2"] += min(1, max(0, month_val["r2"]))
+
+    total_projects = len(REPOSITORIES)
+    for month_key in average_scores.keys():
+        average_scores[month_key]["performance"] /= total_projects
+        average_scores[month_key]["deviation"] /= total_projects
+        average_scores[month_key]["r2"] /= total_projects
+
+    n_months_accuracy["average_scores"] = average_scores
+
     with open("../data/n_patterns_forecast_accuracy.json", "w") as outfile:
         json.dump(n_months_accuracy, outfile, indent=4)
 
