@@ -6,7 +6,6 @@ from pathlib import Path
 import joblib
 import pandas as pd
 from mlforecast import MLForecast
-from ruptures.metrics import precision_recall
 from sklearn.metrics import r2_score
 from xgboost import XGBRegressor
 
@@ -334,9 +333,6 @@ if __name__ == "__main__":
                     )
 
                 # Compute scores
-                precision, recall = precision_recall(
-                    repository_patterns_idxs[target_metric], metric_phases
-                )
                 r2_value = r2_score(
                     metrics_time_series[target_metric]["values"], full_values
                 )
@@ -345,8 +341,6 @@ if __name__ == "__main__":
 
                 log.info(target_metric)
                 log.info(f"R2: {r2_value}")
-                log.info(f"Precision: {precision}")
-                log.info(f"Recall: {recall}")
                 log.info("-----------------")
 
             if total_predictions > 0:
