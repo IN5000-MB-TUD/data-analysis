@@ -41,7 +41,7 @@ REPOSITORIES = [
     "woocommerce/woocommerce",
 ]
 REPOSITORY_CLUSTER = 0
-N_MONTHS = [2, 4, 6, 12, 24, 48, 72]
+N_MONTHS = [1, 2, 4, 6, 12, 24, 48, 72]
 PHASES_LABELS = ["Steep", "Shallow", "Plateau"]
 METRICS = [
     "stargazers",
@@ -235,7 +235,9 @@ if __name__ == "__main__":
         repository_patterns = repository_metrics_phases[repository_full_name]
         repository_patterns_idxs = repository_metrics_phases_idxs[repository_full_name]
 
-        n_months_accuracy[repository_full_name] = {}
+        if repository_full_name not in n_months_accuracy:
+            n_months_accuracy[repository_full_name] = {}
+
         for n in N_MONTHS:
             log.info(f"Evaluating {n} months training")
             total_predictions = 0
@@ -352,17 +354,8 @@ if __name__ == "__main__":
                     "r2": r2_average / len(METRICS),
                 }
 
+            log.info(n_months_accuracy[repository_full_name])
             log.info("----------------------------------------------\n")
-
-        log.info(n_months_accuracy[repository_full_name])
-
-        best_accuracy = -1
-        best_n = ""
-        for n_key, n_items in n_months_accuracy[repository_full_name].items():
-            if n_items["performance"] > best_accuracy:
-                best_accuracy = n_items["performance"]
-                best_n = n_key
-        log.info(f"Best N is {best_n} with accuracy {round(best_accuracy, 3)}")
 
     # Compute average scores
     average_scores = {}
@@ -388,5 +381,13 @@ if __name__ == "__main__":
 
     with open("../data/n_patterns_forecast_accuracy.json", "w") as outfile:
         json.dump(n_months_accuracy, outfile, indent=4)
+
+    best_accuracy = -1
+    best_n = ""
+    for n_key, n_items in n_months_accuracy["average_scores"].items():
+        if n_items["performance"] > best_accuracy:
+            best_accuracy = n_items["performance"]
+            best_n = n_key
+    log.info(f"Best N is {best_n} with accuracy {round(best_accuracy, 3)}")
 
     log.info("Done!")
