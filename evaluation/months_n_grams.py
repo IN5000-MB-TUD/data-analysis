@@ -72,6 +72,42 @@ if __name__ == "__main__":
             ):
                 corpus += " ".join(metric_patterns_sequence) + ". "
 
+    # Build baseline by only repeating the previous pattern for the next months
+    total_predictions = 0
+    correct_predictions = 0
+    deviation_predictions = 0
+
+    for (
+        repository_name,
+        repository_metrics,
+    ) in repository_metrics_patterns_sequence.items():
+        if repository_name not in x_test:
+            continue
+
+        repository_age_months = len(repository_metrics["commits"])
+
+        for metric, metric_patterns in repository_metrics.items():
+            predicted = [metric_patterns[0]] * repository_age_months
+
+            # Count correct predictions
+            for idx, pred_values in enumerate(predicted):
+                total_predictions += 1
+                if pred_values == metric_patterns[idx]:
+                    correct_predictions += 1
+                deviation_predictions += abs(
+                    PATTERNS_MAP[pred_values] - PATTERNS_MAP[metric_patterns[idx]]
+                )
+
+    if total_predictions > 0:
+        baseline_scores = {
+            "correct_predictions": correct_predictions,
+            "total_predictions": total_predictions,
+            "performance": correct_predictions / total_predictions,
+            "deviation": deviation_predictions / total_predictions,
+        }
+    else:
+        baseline_scores = {}
+
     # Compute bigrams probabilities
     corpus = corpus.lower()
     corpus = "eos " + corpus
@@ -195,6 +231,7 @@ if __name__ == "__main__":
                 "deviation": deviation_predictions / total_predictions,
             }
 
+    n_grams_accuracy["baseline"] = baseline_scores
     log.info(n_grams_accuracy)
     with open("../data/n_grams_accuracy.json", "w") as outfile:
         json.dump(n_grams_accuracy, outfile, indent=4)
