@@ -27,7 +27,9 @@ SHOW_PLOTS = False
 PHASES_LABELS = ["Steep", "Shallow", "Plateau"]
 
 
-def _group_metric_by_month(dates, total_months, min_date, metric_values):
+def _group_metric_by_month(
+    dates, total_months, min_date, metric_values, monotonic=True
+):
     """Group given list of dates by month."""
     if not dates:
         return []
@@ -52,7 +54,10 @@ def _group_metric_by_month(dates, total_months, min_date, metric_values):
             and month_idx == dates_grouped[dates_grouped_idx][0]
         ):
             month_last_date = dates_grouped[dates_grouped_idx][1][-1]
-            metric_counter = values_by_date[month_last_date]
+            if monotonic:
+                metric_counter += values_by_date[month_last_date]
+            else:
+                metric_counter = values_by_date[month_last_date]
 
             dates_grouped_idx += 1
 
@@ -140,6 +145,7 @@ if __name__ == "__main__":
                 metric_data["values"],
                 show_plot=SHOW_PLOTS,
                 plot_title=f"{repository_full_name} {metric}",
+                window_size=6,
             )
 
             normalized_values = normalize(metric_data["values"], 0, 1) + [1]
