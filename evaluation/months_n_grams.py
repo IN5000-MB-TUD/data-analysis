@@ -23,6 +23,7 @@ PATTERNS_MAP = {
     "plateau": 2,
 }
 N_TESTS = [2, 3, 4, 7, 13, 25]
+FULL_MATRIX = True
 
 
 if __name__ == "__main__":
@@ -87,6 +88,13 @@ if __name__ == "__main__":
         repository_age_months = len(repository_metrics["commits"])
 
         for metric, metric_patterns in repository_metrics.items():
+            # Skip if the full evaluation is False and the metric only has one pattern
+            if (
+                not FULL_MATRIX
+                and repository_metrics_phases_count[repository_name][metric] <= 1
+            ):
+                continue
+
             predicted = [metric_patterns[0]] * repository_age_months
 
             # Count correct predictions
@@ -137,10 +145,14 @@ if __name__ == "__main__":
     log.info(bi_grams_probability_table)
 
     # Evaluate the best N performance on test data
-    if not Path("../data/n_grams_accuracy.json").exists():
+    if FULL_MATRIX:
+        n_grams_accuracy_output_file = "n_grams_accuracy.json"
+    else:
+        n_grams_accuracy_output_file = "n_grams_accuracy_not_full_matrix.json"
+    if not Path(f"../data/{n_grams_accuracy_output_file}").exists():
         n_grams_accuracy = {}
     else:
-        with open("../data/n_grams_accuracy.json") as json_file:
+        with open(f"../data/{n_grams_accuracy_output_file}") as json_file:
             n_grams_accuracy = json.load(json_file)
 
     for n in N_TESTS:
@@ -161,6 +173,13 @@ if __name__ == "__main__":
                 continue
 
             for metric, metric_patterns in repository_metrics.items():
+                # Skip if the full evaluation is False and the metric only has one pattern
+                if (
+                    not FULL_MATRIX
+                    and repository_metrics_phases_count[repository_name][metric] <= 1
+                ):
+                    continue
+
                 # Predict next patterns based on probabilities
                 backwards_n = n - 1
                 predicted = [i for i in metric_patterns[:backwards_n]]
@@ -233,7 +252,7 @@ if __name__ == "__main__":
 
     n_grams_accuracy["baseline"] = baseline_scores
     log.info(n_grams_accuracy)
-    with open("../data/n_grams_accuracy.json", "w") as outfile:
+    with open(f"../data/{n_grams_accuracy_output_file}", "w") as outfile:
         json.dump(n_grams_accuracy, outfile, indent=4)
 
     best_accuracy = -1
