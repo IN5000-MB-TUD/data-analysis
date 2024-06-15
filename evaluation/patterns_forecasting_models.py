@@ -6,6 +6,7 @@ from pathlib import Path
 import joblib
 import pandas as pd
 from mlforecast import MLForecast
+from ruptures.metrics import precision_recall, hausdorff, randindex
 from sklearn.metrics import r2_score
 from xgboost import XGBRegressor
 
@@ -244,6 +245,10 @@ if __name__ == "__main__":
             correct_predictions = 0
             deviation_predictions = 0
             r2_average = 0
+            precision_average = 0
+            recall_average = 0
+            h_score_average = 0
+            rand_idx_average = 0
 
             cut_month = n
             forecast_horizon = repository_age_months - cut_month
@@ -338,24 +343,52 @@ if __name__ == "__main__":
                 r2_value = r2_score(
                     metrics_time_series[target_metric]["values"], full_values
                 )
-
                 r2_average += r2_value
+
+                try:
+                    precision, recall = precision_recall(
+                        repository_patterns_idxs[target_metric],
+                        metric_phases,
+                        margin=12,
+                    )
+                except ZeroDivisionError:
+                    precision, recall = 0, 0
+                precision_average += precision
+                recall_average += recall
+
+                try:
+                    h_score = hausdorff(
+                        repository_patterns_idxs[target_metric], metric_phases
+                    )
+                except ValueError:
+                    h_score = 0
+                h_score_average += h_score
+
+                rand_idx_score = randindex(
+                    repository_patterns_idxs[target_metric], metric_phases
+                )
+                rand_idx_average += rand_idx_score
 
                 log.info(target_metric)
                 log.info(f"R2: {r2_value}")
                 log.info("-----------------")
 
             if total_predictions > 0:
+                metrics_count = len(METRICS)
                 n_months_accuracy[repository_full_name][f"{n}_months"] = {
                     "correct_predictions": correct_predictions,
                     "total_predictions": total_predictions,
                     "performance": correct_predictions / total_predictions,
                     "deviation": deviation_predictions / total_predictions,
-                    "r2": r2_average / len(METRICS),
+                    "r2": r2_average / metrics_count,
+                    "precision": precision_average / metrics_count,
+                    "recall": recall_average / metrics_count,
+                    "hausdorff": h_score_average / metrics_count,
+                    "random_index": rand_idx_average / metrics_count,
                 }
 
-            log.info(n_months_accuracy[repository_full_name])
-            log.info("----------------------------------------------\n")
+        log.info(n_months_accuracy[repository_full_name])
+        log.info("----------------------------------------------\n")
 
     # Compute average scores
     average_scores = {}
@@ -366,16 +399,28 @@ if __name__ == "__main__":
                     "performance": 0,
                     "deviation": 0,
                     "r2": 0,
+                    "precision": 0,
+                    "recall": 0,
+                    "hausdorff": 0,
+                    "random_index": 0,
                 }
             average_scores[month_key]["performance"] += month_val["performance"]
             average_scores[month_key]["deviation"] += month_val["deviation"]
             average_scores[month_key]["r2"] += min(1, max(0, month_val["r2"]))
+            average_scores[month_key]["precision"] += month_val["precision"]
+            average_scores[month_key]["recall"] += month_val["recall"]
+            average_scores[month_key]["hausdorff"] += month_val["hausdorff"]
+            average_scores[month_key]["random_index"] += month_val["random_index"]
 
     total_projects = len(REPOSITORIES)
     for month_key in average_scores.keys():
         average_scores[month_key]["performance"] /= total_projects
         average_scores[month_key]["deviation"] /= total_projects
         average_scores[month_key]["r2"] /= total_projects
+        average_scores[month_key]["precision"] /= total_projects
+        average_scores[month_key]["recall"] /= total_projects
+        average_scores[month_key]["hausdorff"] /= total_projects
+        average_scores[month_key]["random_index"] /= total_projects
 
     n_months_accuracy["average_scores"] = average_scores
 
