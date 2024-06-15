@@ -23,7 +23,6 @@ PATTERNS_MAP = {
     "plateau": 2,
 }
 N_TESTS = [2, 3, 4, 7, 13, 25]
-FULL_MATRIX = True
 
 
 if __name__ == "__main__":
@@ -73,49 +72,6 @@ if __name__ == "__main__":
             ):
                 corpus += " ".join(metric_patterns_sequence) + ". "
 
-    # Build baseline by only repeating the previous pattern for the next months
-    total_predictions = 0
-    correct_predictions = 0
-    deviation_predictions = 0
-
-    for (
-        repository_name,
-        repository_metrics,
-    ) in repository_metrics_patterns_sequence.items():
-        if repository_name not in x_test:
-            continue
-
-        repository_age_months = len(repository_metrics["commits"])
-
-        for metric, metric_patterns in repository_metrics.items():
-            # Skip if the full evaluation is False and the metric only has one pattern
-            if (
-                not FULL_MATRIX
-                and repository_metrics_phases_count[repository_name][metric] <= 1
-            ):
-                continue
-
-            predicted = [metric_patterns[0]] * repository_age_months
-
-            # Count correct predictions
-            for idx, pred_values in enumerate(predicted):
-                total_predictions += 1
-                if pred_values == metric_patterns[idx]:
-                    correct_predictions += 1
-                deviation_predictions += abs(
-                    PATTERNS_MAP[pred_values] - PATTERNS_MAP[metric_patterns[idx]]
-                )
-
-    if total_predictions > 0:
-        baseline_scores = {
-            "correct_predictions": correct_predictions,
-            "total_predictions": total_predictions,
-            "performance": correct_predictions / total_predictions,
-            "deviation": deviation_predictions / total_predictions,
-        }
-    else:
-        baseline_scores = {}
-
     # Compute bigrams probabilities
     corpus = corpus.lower()
     corpus = "eos " + corpus
@@ -144,123 +100,175 @@ if __name__ == "__main__":
     log.info("Probability Table: \n")
     log.info(bi_grams_probability_table)
 
-    # Evaluate the best N performance on test data
-    if FULL_MATRIX:
-        n_grams_accuracy_output_file = "n_grams_accuracy.json"
-    else:
-        n_grams_accuracy_output_file = "n_grams_accuracy_not_full_matrix.json"
-    if not Path(f"../data/{n_grams_accuracy_output_file}").exists():
-        n_grams_accuracy = {}
-    else:
-        with open(f"../data/{n_grams_accuracy_output_file}") as json_file:
-            n_grams_accuracy = json.load(json_file)
+    for full_matrix in [True, False]:
+        # Build baseline by only repeating the previous pattern for the next months
+        baseline_scores = {}
 
-    for n in N_TESTS:
-        log.info(f"Evaluating {n}-grams...")
-        total_predictions = 0
-        correct_predictions = 0
-        deviation_predictions = 0
+        for n in N_TESTS:
+            total_predictions = 0
+            correct_predictions = 0
+            deviation_predictions = 0
 
-        for (
-            repository_name,
-            repository_metrics,
-        ) in repository_metrics_patterns_sequence.items():
-            if repository_name not in x_test:
-                continue
-
-            repository_age_months = len(repository_metrics["commits"])
-            if repository_age_months < n:
-                continue
-
-            for metric, metric_patterns in repository_metrics.items():
-                # Skip if the full evaluation is False and the metric only has one pattern
-                if (
-                    not FULL_MATRIX
-                    and repository_metrics_phases_count[repository_name][metric] <= 1
-                ):
+            for (
+                repository_name,
+                repository_metrics,
+            ) in repository_metrics_patterns_sequence.items():
+                if repository_name not in x_test:
                     continue
 
-                # Predict next patterns based on probabilities
-                backwards_n = n - 1
-                predicted = [i for i in metric_patterns[:backwards_n]]
-                moving_idx = backwards_n
+                repository_age_months = len(repository_metrics["commits"])
 
-                for i in metric_patterns[backwards_n:]:
-                    base_patterns = [
-                        i for i in predicted[moving_idx - backwards_n : moving_idx]
-                    ]
-                    if len(base_patterns) > 1:
-                        # Compute probability of n-gram using chain rule and use it to retrieve the best next pattern
-                        if moving_idx - backwards_n == 0:
-                            bi_grams_corpus = ["eos"] + base_patterns
-                        elif moving_idx == repository_age_months:
-                            bi_grams_corpus = base_patterns + ["eos"]
+                for metric, metric_patterns in repository_metrics.items():
+                    # Skip if the full evaluation is False and the metric only has one pattern
+                    if (
+                        not full_matrix
+                        and repository_metrics_phases_count[repository_name][metric]
+                        <= 1
+                    ):
+                        continue
+
+                    latest_value = metric_patterns[:n][-1]
+                    predicted = [latest_value] * repository_age_months
+
+                    # Count correct predictions
+                    for idx, pred_values in enumerate(predicted):
+                        total_predictions += 1
+                        if pred_values == metric_patterns[idx]:
+                            correct_predictions += 1
+                        deviation_predictions += abs(
+                            PATTERNS_MAP[pred_values]
+                            - PATTERNS_MAP[metric_patterns[idx]]
+                        )
+
+            if total_predictions > 0:
+                baseline_scores[f"{n}_grams"] = {
+                    "correct_predictions": correct_predictions,
+                    "total_predictions": total_predictions,
+                    "performance": correct_predictions / total_predictions,
+                    "deviation": deviation_predictions / total_predictions,
+                }
+
+        # Evaluate the best N performance on test data
+        if full_matrix:
+            n_grams_accuracy_output_file = "n_grams_accuracy.json"
+        else:
+            n_grams_accuracy_output_file = "n_grams_accuracy_not_full_matrix.json"
+        if not Path(f"../data/{n_grams_accuracy_output_file}").exists():
+            n_grams_accuracy = {}
+        else:
+            with open(f"../data/{n_grams_accuracy_output_file}") as json_file:
+                n_grams_accuracy = json.load(json_file)
+
+        for n in N_TESTS:
+            log.info(f"Evaluating {n}-grams...")
+            total_predictions = 0
+            correct_predictions = 0
+            deviation_predictions = 0
+
+            for (
+                repository_name,
+                repository_metrics,
+            ) in repository_metrics_patterns_sequence.items():
+                if repository_name not in x_test:
+                    continue
+
+                repository_age_months = len(repository_metrics["commits"])
+                if repository_age_months < n:
+                    continue
+
+                for metric, metric_patterns in repository_metrics.items():
+                    # Skip if the full evaluation is False and the metric only has one pattern
+                    if (
+                        not full_matrix
+                        and repository_metrics_phases_count[repository_name][metric]
+                        <= 1
+                    ):
+                        continue
+
+                    # Predict next patterns based on probabilities
+                    backwards_n = n - 1
+                    predicted = [i for i in metric_patterns[:backwards_n]]
+                    moving_idx = backwards_n
+
+                    for i in metric_patterns[backwards_n:]:
+                        base_patterns = [
+                            i for i in predicted[moving_idx - backwards_n : moving_idx]
+                        ]
+                        if len(base_patterns) > 1:
+                            # Compute probability of n-gram using chain rule and use it to retrieve the best next pattern
+                            if moving_idx - backwards_n == 0:
+                                bi_grams_corpus = ["eos"] + base_patterns
+                            elif moving_idx == repository_age_months:
+                                bi_grams_corpus = base_patterns + ["eos"]
+                            else:
+                                bi_grams_corpus = base_patterns
+                            sequence_bi_grams = generate_ngrams(bi_grams_corpus, 2)
+                            probability = 1
+                            for bi_gram in sequence_bi_grams:
+                                probability *= bi_grams_probability_table.loc[
+                                    bi_grams_probability_table["Token"] == bi_gram[0]
+                                ][bi_gram[1]].to_numpy()[0]
+
+                            # Look for highest probability
+                            highest_probability = -1
+                            best_next_pattern = ""
+                            for pattern in PATTERNS_LABELS:
+                                pattern_probability = (
+                                    probability
+                                    * bi_grams_probability_table.loc[
+                                        bi_grams_probability_table["Token"]
+                                        == base_patterns[-1]
+                                    ][pattern].to_numpy()[0]
+                                )
+                                if pattern_probability > highest_probability:
+                                    highest_probability = pattern_probability
+                                    best_next_pattern = pattern
                         else:
-                            bi_grams_corpus = base_patterns
-                        sequence_bi_grams = generate_ngrams(bi_grams_corpus, 2)
-                        probability = 1
-                        for bi_gram in sequence_bi_grams:
-                            probability *= bi_grams_probability_table.loc[
-                                bi_grams_probability_table["Token"] == bi_gram[0]
-                            ][bi_gram[1]].to_numpy()[0]
-
-                        # Look for highest probability
-                        highest_probability = -1
-                        best_next_pattern = ""
-                        for pattern in PATTERNS_LABELS:
-                            pattern_probability = (
-                                probability
-                                * bi_grams_probability_table.loc[
+                            # Only looking 1 month back, just look directly at the bigrams probability table
+                            highest_probability = -1
+                            best_next_pattern = ""
+                            for pattern in PATTERNS_LABELS:
+                                pattern_probability = bi_grams_probability_table.loc[
                                     bi_grams_probability_table["Token"]
                                     == base_patterns[-1]
                                 ][pattern].to_numpy()[0]
-                            )
-                            if pattern_probability > highest_probability:
-                                highest_probability = pattern_probability
-                                best_next_pattern = pattern
-                    else:
-                        # Only looking 1 month back, just look directly at the bigrams probability table
-                        highest_probability = -1
-                        best_next_pattern = ""
-                        for pattern in PATTERNS_LABELS:
-                            pattern_probability = bi_grams_probability_table.loc[
-                                bi_grams_probability_table["Token"] == base_patterns[-1]
-                            ][pattern].to_numpy()[0]
-                            if pattern_probability > highest_probability:
-                                highest_probability = pattern_probability
-                                best_next_pattern = pattern
+                                if pattern_probability > highest_probability:
+                                    highest_probability = pattern_probability
+                                    best_next_pattern = pattern
 
-                    predicted.append(best_next_pattern)
-                    moving_idx += 1
+                        predicted.append(best_next_pattern)
+                        moving_idx += 1
 
-                # Count correct predictions
-                for idx, pred_values in enumerate(predicted[backwards_n:]):
-                    total_predictions += 1
-                    if pred_values == metric_patterns[idx]:
-                        correct_predictions += 1
-                    deviation_predictions += abs(
-                        PATTERNS_MAP[pred_values] - PATTERNS_MAP[metric_patterns[idx]]
-                    )
+                    # Count correct predictions
+                    for idx, pred_values in enumerate(predicted[backwards_n:]):
+                        total_predictions += 1
+                        if pred_values == metric_patterns[idx]:
+                            correct_predictions += 1
+                        deviation_predictions += abs(
+                            PATTERNS_MAP[pred_values]
+                            - PATTERNS_MAP[metric_patterns[idx]]
+                        )
 
-        if total_predictions > 0:
-            n_grams_accuracy[f"{n}_grams"] = {
-                "correct_predictions": correct_predictions,
-                "total_predictions": total_predictions,
-                "performance": correct_predictions / total_predictions,
-                "deviation": deviation_predictions / total_predictions,
-            }
+            if total_predictions > 0:
+                n_grams_accuracy[f"{n}_grams"] = {
+                    "correct_predictions": correct_predictions,
+                    "total_predictions": total_predictions,
+                    "performance": correct_predictions / total_predictions,
+                    "deviation": deviation_predictions / total_predictions,
+                }
 
-    n_grams_accuracy["baseline"] = baseline_scores
-    log.info(n_grams_accuracy)
-    with open(f"../data/{n_grams_accuracy_output_file}", "w") as outfile:
-        json.dump(n_grams_accuracy, outfile, indent=4)
+        n_grams_accuracy["baseline"] = baseline_scores
+        log.info(n_grams_accuracy)
+        with open(f"../data/{n_grams_accuracy_output_file}", "w") as outfile:
+            json.dump(n_grams_accuracy, outfile, indent=4)
 
-    best_accuracy = -1
-    best_n = ""
-    for n_key, n_items in n_grams_accuracy.items():
-        if n_items["performance"] > best_accuracy:
-            best_accuracy = n_items["performance"]
-            best_n = n_key
-    log.info(f"Best N is {best_n} with accuracy {round(best_accuracy, 3)}")
+        best_accuracy = -1
+        best_n = ""
+        for n_key, n_items in n_grams_accuracy.items():
+            if n_key != "baseline":
+                if n_items["performance"] > best_accuracy:
+                    best_accuracy = n_items["performance"]
+                    best_n = n_key
+        log.info(f"Best N is {best_n} with accuracy {round(best_accuracy, 3)}")
 
     log.info("Done!")
