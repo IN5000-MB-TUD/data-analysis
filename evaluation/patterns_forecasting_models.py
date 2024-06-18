@@ -12,6 +12,7 @@ from xgboost import XGBRegressor
 
 from connection import mo
 from data_processing.time_series_phases import extrapolate_phases_properties
+from evaluation.helpers import compute_monthly_patterns
 from utils.data import (
     get_metric_time_series,
     get_metrics_information,
@@ -56,18 +57,6 @@ METRICS = [
     "releases",
     "size",
 ]
-
-
-# Define helpers
-def _compute_monthly_patterns(metric_patterns, metric_patterns_idxs):
-    """Return a sequence of each monthly pattern"""
-    metric_patterns_sequence = []
-    patterns_boundaries = list(zip(metric_patterns_idxs[:-1], metric_patterns_idxs[1:]))
-    for pattern_idx, pattern in enumerate(metric_patterns):
-        metric_patterns_sequence += [pattern] * (
-            patterns_boundaries[pattern_idx][1] - patterns_boundaries[pattern_idx][0]
-        )
-    return metric_patterns_sequence
 
 
 if __name__ == "__main__":
@@ -320,11 +309,11 @@ if __name__ == "__main__":
                 )
 
                 # Count correct predictions
-                actual_patterns_sequence = _compute_monthly_patterns(
+                actual_patterns_sequence = compute_monthly_patterns(
                     repository_patterns[target_metric],
                     [0] + repository_patterns_idxs[target_metric],
                 )
-                forecasted_patterns_sequence = _compute_monthly_patterns(
+                forecasted_patterns_sequence = compute_monthly_patterns(
                     forecasted_clustered_phases, [0] + metric_phases
                 )
 
