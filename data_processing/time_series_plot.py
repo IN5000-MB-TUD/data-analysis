@@ -21,7 +21,7 @@ def create_plot(
 ):
     """Create plot and save it as PNG"""
     # Adjusting the figure size
-    plt.subplots(figsize=(16, 8))
+    plt.subplots(figsize=(11, 8))
 
     # Creating a plot
     for y_idx, y_data in enumerate(y):
@@ -38,11 +38,12 @@ def create_plot(
     plt.title(subtitle, fontsize=15)
 
     # Adding axis labels and customizing their font size
-    plt.xlabel(xlabel, fontsize=15)
-    plt.ylabel(ylabel, fontsize=15)
+    plt.xlabel(xlabel, fontsize=16)
+    plt.ylabel(ylabel, fontsize=16)
 
     # Rotating axis ticks and customizing their font size
-    plt.xticks(rotation=30, fontsize=15)
+    plt.xticks(rotation=0, fontsize=15)
+    plt.yticks(rotation=0, fontsize=15)
 
     if save_plot:
         # Saving the resulting plot to a file

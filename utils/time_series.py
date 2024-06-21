@@ -123,16 +123,24 @@ def time_series_phases(
 
     if show_plot:
         fig, axarr = rpt.show.display(
-            time_series_np, phases_break_points, phases_break_points, figsize=(10, 6)
+            time_series_np, phases_break_points, phases_break_points, figsize=(11, 8)
         )
 
         if fig and axarr:
-            fig.tight_layout(pad=2)
-            axarr[0].set_title(f"{plot_title} phases")
-            axarr[0].set_xlabel("Month")
-            axarr[0].set_ylabel("Count")
+            fig.tight_layout(pad=5)
 
-        plt.show()
+            # Adding a plot title and customizing its font size
+            plt.suptitle(f"{plot_title} phases", fontsize=20)
+
+            # Adding axis labels and customizing their font size
+            plt.xlabel("Month", fontsize=16)
+            plt.ylabel("Count", fontsize=16)
+
+            # Rotating axis ticks and customizing their font size
+            plt.xticks(rotation=0, fontsize=15)
+            plt.yticks(rotation=0, fontsize=15)
+
+            plt.show()
 
     return phases_break_points
 
