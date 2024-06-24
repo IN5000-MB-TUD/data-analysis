@@ -1,5 +1,6 @@
 import json
 import logging
+from itertools import product
 from pathlib import Path
 
 import pandas as pd
@@ -37,7 +38,7 @@ def generate_ngram_freq(n_gram):
 
 
 def generate_probability_table(
-    distinct_tokens_list, distinct_tokens_frequency, ngram_freq
+    distinct_tokens_list, distinct_tokens_frequency, ngram_freq, precision=3
 ):
     """Generate n-grams probability table"""
     n_tokens = len(distinct_tokens_list)
@@ -52,7 +53,9 @@ def generate_probability_table(
             sequence = distinct_tokens_list[i] + " " + distinct_tokens_list[j]
             numerator = ngram_freq[sequence] if sequence in ngram_freq else 0
 
-            row_dict[distinct_tokens_list[j]] = round(numerator / denominator, 3)
+            row_dict[distinct_tokens_list[j]] = round(
+                numerator / denominator, precision
+            )
 
         probability_table_rows.append(row_dict)
 
@@ -63,17 +66,6 @@ def generate_probability_table(
 # Start execution
 if __name__ == "__main__":
     log.info("Start computing phases probabilities")
-
-    # Retrieve phases from database
-    evolution_phases = mo.db["evolution_phases"].find()
-    phases_names = {}
-    for phase in evolution_phases:
-        phases_names[f"phase_{phase['phase_id']}"] = {
-            "phase_id": phase["phase_id"],
-            "phase_name": phase["phase_name"],
-        }
-
-    PHASES = len(phases_names)
 
     if not Path("../data/repository_metrics_phases.json").exists():
         log.warning(
@@ -90,11 +82,13 @@ if __name__ == "__main__":
     max_segments = -1
     for repository_name, metrics_phases in repository_metrics_phases.items():
         for metric, phases in metrics_phases.items():
-            max_segments = max(
-                max_segments, repository_metrics_phases_count[repository_name][metric]
-            )
-            patterns_sequence = [PATTERNS_LABELS[x] for x in phases]
-            corpus += " ".join(patterns_sequence) + ". "
+            if repository_metrics_phases_count[repository_name][metric] > 1:
+                max_segments = max(
+                    max_segments,
+                    repository_metrics_phases_count[repository_name][metric],
+                )
+                patterns_sequence = [PATTERNS_LABELS[x] for x in phases]
+                corpus += " ".join(patterns_sequence) + ". "
 
     log.info(f"Max segments: {max_segments}")
 
@@ -133,42 +127,15 @@ if __name__ == "__main__":
     log.info(f"Probability Table: \n")
     log.info(bi_grams_probability_table)
 
-    sequences = [
-        # Steep first
-        [0, 0, 0],
-        [0, 1, 0],
-        [0, 2, 0],
-        [0, 0, 1],
-        [0, 1, 1],
-        [0, 2, 1],
-        [0, 0, 2],
-        [0, 1, 2],
-        [0, 2, 2],
-        # Shallow first
-        [1, 0, 0],
-        [1, 1, 0],
-        [1, 2, 0],
-        [1, 0, 1],
-        [1, 1, 1],
-        [1, 2, 1],
-        [1, 0, 2],
-        [1, 1, 2],
-        [1, 2, 2],
-        # Plateau first
-        [2, 0, 0],
-        [2, 1, 0],
-        [2, 2, 0],
-        [2, 0, 1],
-        [2, 1, 1],
-        [2, 2, 1],
-        [2, 0, 2],
-        [2, 1, 2],
-        [2, 2, 2],
-    ]
+    # Tri-grams
+    sequences = []
+    for i in product([0, 1, 2], repeat=3):
+        sequences.append(list(i))
+
     sequences_probability_rows = []
     for sequence in sequences:
         sequence_tokens = [PATTERNS_LABELS[i].lower() for i in sequence]
-        sequence_bi_grams = generate_ngrams(["eos"] + sequence_tokens, 2)
+        sequence_bi_grams = generate_ngrams(["eos"] + sequence_tokens + ["eos"], 2)
         probability = 1
         for bi_gram in sequence_bi_grams:
             probability *= bi_grams_probability_table.loc[
