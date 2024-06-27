@@ -27,6 +27,52 @@ if __name__ == "__main__":
         "Evaluating the multivariate time series clustering using a different amount of input data"
     )
 
+    # Get clusters patterns distribution
+    with open("../data/repository_metrics_phases.json") as json_file:
+        repository_metrics_phases = json.load(json_file)
+    with open("../data/repository_clusters.json") as json_file:
+        repository_clusters = json.load(json_file)
+
+    clusters_patterns_distribution = {
+        "Cluster_0": [0, 0, 0],
+        "Cluster_1": [0, 0, 0],
+        "Cluster_2": [0, 0, 0],
+    }
+
+    for cluster, cluster_repos in repository_clusters.items():
+        for repository_name in cluster_repos:
+            # Count patterns
+            for metric, metric_patterns in repository_metrics_phases[
+                repository_name
+            ].items():
+                for pattern in metric_patterns:
+                    clusters_patterns_distribution[cluster][pattern] += 1
+
+    log.info(clusters_patterns_distribution)
+
+    clusters_patterns_totals = {
+        "Cluster_0": sum(clusters_patterns_distribution["Cluster_0"]),
+        "Cluster_1": sum(clusters_patterns_distribution["Cluster_1"]),
+        "Cluster_2": sum(clusters_patterns_distribution["Cluster_2"]),
+    }
+
+    clusters_patterns_percentages = {
+        "Cluster_0": [
+            round(i / clusters_patterns_totals["Cluster_0"], 3)
+            for i in clusters_patterns_distribution["Cluster_0"]
+        ],
+        "Cluster_1": [
+            round(i / clusters_patterns_totals["Cluster_1"], 3)
+            for i in clusters_patterns_distribution["Cluster_1"]
+        ],
+        "Cluster_2": [
+            round(i / clusters_patterns_totals["Cluster_2"], 3)
+            for i in clusters_patterns_distribution["Cluster_2"]
+        ],
+    }
+
+    log.info(clusters_patterns_percentages)
+
     # Get the repositories in the database
     repositories = list(
         mo.db["repositories_data"].find({"statistics": {"$exists": True}})

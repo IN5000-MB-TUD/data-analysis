@@ -1,10 +1,19 @@
-# Repositories Data Analysis
+# A Framework for Identifying Evolution Patterns of Open-Source Software Projects
 
-IN5000 TU Delft - MSc Computer Science - Data Analysis
+IN5000 TU Delft - MSc Computer Science
+
+This repository contains the scripts to reproduce and expand the work for the MSc Thesis in Computer Science related to developing a framework for identifying the evolution patterns of open-source software projects. 
+
+## Paper
+
+The MSc Thesis paper is available at the following URL:
+
+
 
 ## Requirements
 
-Python Version must be >= 3.10.
+- Python >= 3.10
+- MongoDB (can be changed if needed but the scripts must be adapted)
 
 Run in the terminal:
 
@@ -58,20 +67,17 @@ python statistics_fill_gaps.py
 
 Move to the `data_processing` folder and run the following scripts:
 
-#### Phases Clustering
+#### Evolution Patterns Modeling
 
 ```shell
 # Move to the data_processing folder
 cd data_processing
 
-# Create the phases clustering model (saved in the models/phases folder)
+# Create the patterns clustering model (saved in the models/phases folder)
 python time_series_phases.py
-
-# Gather the occurrence probabilities of each phase (stored in the database)
-python time_series_n_grams.py
 ```
 
-#### Repositories Clustering
+#### Multivariate Time Series Clustering
 
 ```shell
 # Move to the data_processing folder
@@ -79,11 +85,10 @@ cd data_processing
 
 # Cluster repositories based on their metrics phases and metrics patterns similarity
 # The clustering model is saved in the models/clustering folder
-# The average curves of each cluster metrics are plotted
 python time_series_clustering.py
 ```
 
-#### Multi-Variate Time Series Forecasting
+#### Multivariate Time Series Forecasting
 
 ```shell
 # Move to the data_processing folder
@@ -91,18 +96,45 @@ cd data_processing
 
 # Create the forecasting models for each metric
 # The forecasting models are saved in the models/forecasting folder
+# One subfolder will be present for each cluster
 python time_series_forecasting.py
 ```
 
-#### Plot Curves
+### Framework Evaluation
+
+Move to the `evaluation` folder and run the following scripts:
 
 ```shell
-# Move to the data_processing folder
-cd data_processing
+# Move to the evaluation folder
+cd evaluation
 
-# Plot the repositories metrics time series curves
-python time_series_plot.py
+# Framework insights - Patterns Modeling
+python patterns_modeling.py
+
+# Framework insights - Clustering
+python multivariate_clustering.py
+
+# Framework insights - Forecasting
+python patterns_forecasting_models.py
+
+# Framework insights - Features importance
+python forecasting_features_importance_ablation.py
+
+# N-grams 
+python months_n_grams.py
 ```
+
+### Framework Pipeline
+
+Move to the `data_pipeline` folder and run the following scripts:
+
+```shell
+# Move to the data_pipeline folder
+cd data_pipeline
+
+# Run the pipeline
+python repository_pipeline.py
+````
 
 ## Code Formatting
 
@@ -115,6 +147,45 @@ black --check ./
 # Format files
 black ./
 ```
+
+## SonarCloud Scripts
+
+To reproduce and/or process more data using [SonarCloud](https://www.sonarsource.com/products/sonarcloud/), follow these steps:
+
+1. Create a SonarCloud free account
+2. Create a project and get the related `SONAR_TOKEN`
+3. Create the project folder in the `sonar_scanner` folder
+4. Create the `pull_releases.sh` and `sonar.sh` scripts following the existing examples
+5. Run in the terminal:
+
+```shell
+# Move to the project folder
+cd project_folder
+
+# Pull repository code releases from GitHub
+./pull_releases.sh
+
+# Process code with SonarCloud
+./sonar.sh
+```
+
+6. Retireve the metrics results from the [SonarCloud API](https://sonarcloud.io/web_api) and store them in JSON files following the existing examples
+7. Run in the terminal
+
+```shell
+# Process the metrics time series to obtain the break points and patterns sequence
+python process_nar_data.py
+```
+
+## Models and Datasets
+
+The models are available in the `model` folder in this repository as well as at the following [HuggingFace Collection](https://huggingface.co/collections/MattiaBonfanti-CS/in5000-mb-tud-65e8756337418d7dbd383f66)
+
+The datasets are available at the same collection and can be placed in the `data` folder. Otherwise, they can be created by running the scripts.
+
+## User Interface
+
+A simple UI to visualize the time series data is available in the following repository: https://github.com/IN5000-MB-TUD/data-app
 
 ## Contributors
 
