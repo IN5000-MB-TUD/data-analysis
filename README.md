@@ -6,9 +6,7 @@ This repository contains the scripts to reproduce and expand the work for the MS
 
 ## Paper
 
-The MSc Thesis paper is available at the following URL:
-
-
+The MSc Thesis paper is available [here](paper/A_Framework_for_Identifying_Evolution_Patterns_of_Open-Source_Software_Projects.pdf).
 
 ## Requirements
 
