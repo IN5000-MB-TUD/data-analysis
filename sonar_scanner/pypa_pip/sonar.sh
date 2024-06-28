@@ -1,5 +1,5 @@
 # Create token variable
-export SONAR_TOKEN=9f5803d35d1a19e490d0b4ab5d2a8b84cb99f380
+export SONAR_TOKEN=sonar_token_here
 
 # Loop through folders and run sonar command
 echo "Start Sonar analysis"
